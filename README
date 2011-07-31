@@ -1,5 +1,16 @@
 This is a goinstall-able mirror of modified code already published at:
 http://git.nic.cz/redmine/projects/gofileutil/repository
 
-Online godoc documentation for this package (should be) available at:
-http://gopkgdoc.appspot.com/pkg/github.com/cznic/fileutil
+Packages in this repository:
+
+Install: $goinstall github.com/cznic/fileutil
+Godocs: http://gopkgdoc.appspot.com/pkg/github.com/cznic/fileutil
+
+Install: $goinstall github.com/cznic/fileutil/storage
+Godocs: http://gopkgdoc.appspot.com/pkg/github.com/cznic/fileutil/storage
+
+Install: $goinstall github.com/cznic/fileutil/falloc
+Godocs: http://gopkgdoc.appspot.com/pkg/github.com/cznic/fileutil/falloc
+
+Install: $goinstall github.com/cznic/fileutil/hdb
+Godocs: http://gopkgdoc.appspot.com/pkg/github.com/cznic/fileutil/hdb
