@@ -108,7 +108,7 @@ Block first byte (Block type tag)
 
         If the last byte of content is not the last byte of an atom, then the last byte of such block,
         i.e. the Z field, which is also a last byte of some atom, MUST be 0x00 (i.e. the used block marker).
-		Other "tail" values are reserved.
+	Other "tail" values are reserved.
 
     0x00
         Used empty block.
