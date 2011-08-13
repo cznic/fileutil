@@ -24,7 +24,7 @@ import (
 	"sync"
 )
 
-const asserts = true
+const asserts = false
 
 func init() {
 	log.SetFlags(log.Flags() | log.Lshortfile)
@@ -37,7 +37,7 @@ func init() {
 // Handle is an uint56 wrapped in an in64, i.e. the most significant byte must be always zero.
 type Handle int64
 
-// Put puts the 7 significant bytes of h into b.
+// Put puts the 7 least significant bytes of h into b. The MSB of h should be zero.
 func (h Handle) Put(b []byte) {
 	if asserts && (uint64(h) >= 1<<56) {
 		panic(&EHandle{Handle: h})
@@ -49,7 +49,7 @@ func (h Handle) Put(b []byte) {
 	}
 }
 
-// Get gets the 7 significant bytes of h from b.
+// Get gets the 7 least significant bytes of h from b. The MSB of h is zeroed.
 func (h *Handle) Get(b []byte) {
 	var x Handle
 	for ofs := 0; ofs <= 6; ofs++ {
@@ -420,7 +420,6 @@ func (f *File) delFree(atom, atoms int64) {
 	prev.Get(b[1:])
 	next.Get(b[8:])
 	if asserts && (prev == 0 && f.freetab[size] != atom) {
-		//log.Fatalf("delFree(%#x, %d), but f.freetab[%d]==%#x", atom, atoms, size, f.freetab[size])
 		panic(&ECorrupted{f.f.Name(), fp + 1})
 	}
 

@@ -25,12 +25,12 @@ import (
 
 var (
 	blockFlag      = flag.Uint("block", 256, "block size for some of the dev tests")
-	cachedFlag     = flag.Bool("cache", false, "enable caching store")
 	cacheTotalFlag = flag.Int64("cachemax", 1<<25, "cache total bytes")
+	cachedFlag     = flag.Bool("cache", false, "enable caching store")
 	devFlag        = flag.Bool("dev", false, "enable dev tests")
 	dropFlag       = flag.Bool("drop", false, "drop system file cache for some of the dev tests before measurement")
-	fnFlag         = flag.String("f", "test.tmp", "test file name")
 	fadviseFlag    = flag.Bool("fadvise", false, "hint kernel about random file access")
+	fnFlag         = flag.String("f", "test.tmp", "test file name")
 	nFlag          = flag.Int("n", 1, "parameter for some of the dev tests")
 	probeFlag      = flag.Bool("probe", false, "report store probe statistics")
 )
@@ -53,11 +53,6 @@ func fopen(fn string) (f *File, err os.Error) {
 			return
 		}
 		advise = func(off int64, len int, write bool) {
-			//if write {
-			//if err = f.Sync(); err != nil {
-			//log.Fatal("advisor sync err", err)
-			//}
-			//}
 			if err = fileutil.Fadvise(f, off, off+int64(len), fileutil.POSIX_FADV_DONTNEED); err != nil {
 				log.Fatal("advisor advise err", err)
 			}
@@ -94,11 +89,6 @@ func fcreate(fn string) (f *File, err os.Error) {
 			return
 		}
 		advise = func(off int64, len int, write bool) {
-			//if write {
-			//if err = f.Sync(); err != nil {
-			//log.Fatal("advisor sync err", err)
-			//}
-			//}
 			if err = fileutil.Fadvise(f, off, off+int64(len), fileutil.POSIX_FADV_DONTNEED); err != nil {
 				log.Fatal("advisor advise err", err)
 			}
@@ -311,7 +301,6 @@ func (f *File) audit() (usedblocks, totalblocks int64, err os.Error) {
 
 	if n := len(freemap); n != 0 {
 		for h, s := range freemap {
-			//fmt.Printf("\n%v\n", freemap)
 			panic(fmt.Errorf("%d lost free blocks in freemap, e.g. %d free atoms @%#x", n, s, h))
 		}
 	}
@@ -337,24 +326,6 @@ func (f *File) checkPrevNext(fp, prev, next int64) {
 		panic(fmt.Errorf("@%#x illegal free atom, next %#x > f.atoms", fp, next))
 	}
 }
-
-//func (f *File) r(b []byte, off int64) {
-//if n, err := f.f.ReadAt(b, off); n != len(b) {
-//panic(err)
-//}
-//}
-
-//func audit(fn string) (usedblocks, totalblocks int64, err os.Error) {
-//f, e := fopen(fn)
-//if e != nil {
-//err = e
-//return
-//}
-
-//defer func() {fclose(f); f = nil}()
-//return f.audit()
-//}
-
 
 func reaudit(t *testing.T, f *File, fn string) (of *File) {
 	var err os.Error
@@ -2966,54 +2937,3 @@ func TestMix(t *testing.T) {
 	dt = float64(time.Nanoseconds()-t0) / 1e9
 	t.Logf("read time C %.3g", dt)
 }
-
-///*
-
-//buf
-//none	falloc.BenchmarkIntChan	 5000000	       427 ns/op	   9.37 MB/s
-//1		falloc.BenchmarkIntChan	 5000000	       717 ns/op	   5.58 MB/s
-//2		falloc.BenchmarkIntChan	 5000000	       456 ns/op	   8.77 MB/s
-//4		falloc.BenchmarkIntChan	 5000000	       327 ns/op	  12.23 MB/s
-//8		falloc.BenchmarkIntChan	10000000	       249 ns/op	  16.06 MB/s
-//16		falloc.BenchmarkIntChan	10000000	       214 ns/op	  18.69 MB/s
-//32		falloc.BenchmarkIntChan	10000000	       196 ns/op	  20.41 MB/s
-//64		falloc.BenchmarkIntChan	10000000	       189 ns/op	  21.16 MB/s
-//128		falloc.BenchmarkIntChan	10000000	       185 ns/op	  21.62 MB/s
-//256		falloc.BenchmarkIntChan	10000000	       183 ns/op	  21.86 MB/s
-//512		falloc.BenchmarkIntChan	10000000	       183 ns/op	  21.86 MB/s
-
-//*/
-//func BenchmarkIntChan(b *testing.B) {
-//c := make(chan int, 512)
-
-//go func() {
-//for i := 0; i < b.N; i++ {
-//c <- i
-//}
-//}()
-
-//for i := 0; i < b.N; i++ {
-//<-c
-//}
-
-//b.SetBytes(4)
-//}
-
-//var iglobal int32
-
-//func BenchmarkIntAtomicAdd(b *testing.B) {
-//for i := 0; i < b.N; i++ {
-//atomic.AddInt32(&iglobal, 1)
-//}
-//b.SetBytes(4)
-//}
-
-//func BenchmarkRWM(b *testing.B) {
-//var rwm sync.RWMutex
-
-//for i := 0; i < b.N; i++ {
-//rwm.Lock()
-//rwm.Unlock()
-//}
-//b.SetBytes(4)
-//}
