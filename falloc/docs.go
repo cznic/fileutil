@@ -209,30 +209,23 @@ The header block has the standard layout of a used short non escaped block.
 
 Special conditions apply: The header block and it's content MUST be like this:
 
-        +------+---------+---------+-----+		
-        |  0   |  1...7  | 8...14  | 15  |
-        +------+---------+---------+-----+		
-        | 0x0F | m6...m0 | f6...f0 | FLT |
-        +------+---------+---------+-----+
+        +------+---------+---------+------+		
+        |  0   |  1...7  | 8...14  |  15  |
+        +------+---------+---------+------+		
+        | 0x0F | m6...m0 | f6...f0 | FLTT |
+        +------+---------+---------+------+
 
 m6..m0 is a "magic" value 0xF1C1A1FE51BlE.
 
 f6...f0 is the atom address of the free lists table (discussed elsewhere).
 If f6...f0 == 0x00 the there is no free lists table (yet).
 
-FLT descibes the type of the Free List Table. Currently define values:
+FLTT descibes the type of the Free List Table type. Currently defined values:
 
 ------------------------------------------------------------------------------
 
-FLT == 0: Free List Table is fixed at atom address 2. It has a fixed size for 3856 entries 
+FLTT == 0: Free List Table is fixed at atom address 2. It has a fixed size for 3856 entries 
 for free list of size 1..3855 atoms and the last is for the list of free block >= 3856 atoms.
-
-------------------------------------------------------------------------------
-
-FLT == 1: (NOT YET IMPLEMENTED) There is no Free List Table. Free space is not reclaimed. New allocations
-do always extend the storage space. Intended only for very specific usage pattern
-where e.g. some structured informations is to be stored but a) never of seldomly deleted/changed
-b) mostly only added c) used in a combination of a) and b).
 */
 package falloc
 

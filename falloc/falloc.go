@@ -8,8 +8,7 @@
 
 This is an mosttly (WIP) conforming implementation of the "specs" in docs.go.
 
-The main incompletness is support for only one kind of a (preallocated) free lists table, 
-though that table kind is still per "specs".
+The main incompletness is support for only one kind of FTL, though this table kind is still per "specs".
 
 */
 
