@@ -79,7 +79,7 @@ are to be carried by the 0x00..0xFB block types.
 
 3.1 If the last byte of content is in 0x00..0xFD then everything is OK.
 
-3.2 If the last byte of content is OxFE or OxFF then the escape via n > 0xF0F0 MUST be used
+3.2 If the last byte of content is 0xFE or 0xFF then the escape via n > 0xF0F0 MUST be used
 AND the block's last byte is 0x00 or 0x01, meaning value 0xFE and 0xFF respectively.
 
 4. n in 0xF0F1...0xFFFF is like the escaped 0xEE..0xFB block.
@@ -142,22 +142,22 @@ All of the rules for 0x01..0xED applies. Depicted only for it's different semant
 
 ------------------------------------------------------------------------------
 
-OxFF: Free atom. Layout - see "Block firts byte": FF.
+0xFF: Free atom. Layout - see "Block firts byte": FF.
 
 ------------------------------------------------------------------------------
 
-OxFE: Free block, size n atoms. Preceding 7 bytes == size (s6...s0) of the free block in atoms, network byte order
+0xFE: Free block, size n atoms. Preceding 7 bytes == size (s6...s0) of the free block in atoms, network byte order
           --++---------++------+
             || -8...-2 ||  -1  |
           --++---------++------+
-        ... || s6...s0 || OxFE | <- block's last byte
+        ... || s6...s0 || 0xFE | <- block's last byte
           --++---------++------+
 
 Layout at start of this block - see "Block first byte": FE.
 
 ------------------------------------------------------------------------------
 
-Ox00...0xFD: Used (non free) block.
+0x00...0xFD: Used (non free) block.
 
 ==============================================================================
 
