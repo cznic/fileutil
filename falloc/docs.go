@@ -142,7 +142,7 @@ All of the rules for 0x01..0xED applies. Depicted only for it's different semant
 
 ------------------------------------------------------------------------------
 
-0xFF: Free atom. Layout - see "Block firts byte": FF.
+0xFF: Free atom. Layout - see "Block first byte": FF.
 
 ------------------------------------------------------------------------------
 
@@ -180,24 +180,24 @@ When freeing blocks, the block MUST be linked into an item list with the highest
 size field, which is less or equal to the number of atoms in the new free block.
 
 When freeing a block, the block MUST be first merged with any adjacent free blocks (thus possibly creating a bigger
-free block) using information derived from the adjacent blocks firts and last bytes. Such merged
+free block) using information derived from the adjacent blocks first and last bytes. Such merged
 free blocks MUST be removed from their original doubly linked lists. Afterwards the new bigger
 free block is put to the free list table in the appropriate item.
 
 Items with address field == 0 are legal. Such item is a placeholder for a empty list of free
 blocks of the item's size. 
 
-Items with size field == 0 are legal. Such item is a placheolder, used e.g. to avoid further
+Items with size field == 0 are legal. Such item is a placeholder, used e.g. to avoid further
 reallocations/redirecting of the free lists table.
 
 The largest possible allocation request (for content length 61680 bytes) is 0xF10 (3856) atoms.
 All free blocks of this or bigger size are presumably put into a single table item
-with the size 3856. It may be useful to additonally have a free lists table item which
+with the size 3856. It may be useful to additionally have a free lists table item which
 links free blocks of some bigger size (say 1M+) and then use the OS sparse file support (if present)
 to save the physical space used by such free blocks. 
 
 Smaller (<3856 atoms) free blocks can be organized exactly (every distinct size has it's table item)
-or the sizes can run using other schemas like e.g. "1, 2, 4, 8, ..." (powers of 2) or "1, 2, 3, 5, 8, 13, ..."
+or the sizes can run using other schema like e.g. "1, 2, 4, 8, ..." (powers of 2) or "1, 2, 3, 5, 8, 13, ..."
 (the Fibonacci sequence) or they may be fine tuned to a specific usage pattern.
 
 ==============================================================================
@@ -220,7 +220,7 @@ m6..m0 is a "magic" value 0xF1C1A1FE51BlE.
 f6...f0 is the atom address of the free lists table (discussed elsewhere).
 If f6...f0 == 0x00 the there is no free lists table (yet).
 
-FLTT descibes the type of the Free List Table type. Currently defined values:
+FLTT describes the type of the Free List Table type. Currently defined values:
 
 ------------------------------------------------------------------------------
 
