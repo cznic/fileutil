@@ -4,21 +4,25 @@
 
 // blame: jnml, labs.nic.cz
 
-// WIP: Package hdb provides a "handle"/value DB like store, but actually it's closer 
-// to the model of a process's virtual memory and it's alloc, free and move methods.
-//
-// The hdb package is a thin layer around falloc.File providing stable-only handles
-// and the basic synchronizing primitives.
-// The central functionality of hdb are the New, Set, Get and Delete methods of Store.
-//
-// Conceptual analogy:
-//	New         alloc(sizeof(content)), return new "memory" pointer (a handle).
-//	Get         memmove() from "memory" "pointed to" by handle to the result content.
-//	            Note: Handle "knows" the size of it's content.
-//	Set         memmove() from content to "memory" pointed to by handle.
-//	            In contrast to real memory, the new content may have different size than the previously 
-//	            stored one w/o additional handling and the "pointer" handle remains the same.
-//	Delete      free() the "memory" "pointed to" by handle.
+/*
+WIP: Package hdb provides a "handle"/value DB like store, but actually it's
+closer to the model of a process's virtual memory and it's alloc, free and move
+methods.
+
+The hdb package is a thin layer around falloc.File providing stable-only
+handles and the basic synchronizing primitives.  The central functionality of
+hdb are the New, Set, Get and Delete methods of Store.
+
+Conceptual analogy:
+	New	    alloc(sizeof(content)), return new "memory" pointer (a handle).
+	Get	    memmove() from "memory" "pointed to" by handle to the result content.
+		    Note: Handle "knows" the size of its content.
+	Set	    memmove() from content to "memory" pointed to by handle.
+		    In contrast to real memory, the new content may have different
+		    size than the previously stored one w/o additional handling
+		    and the "pointer" handle remains the same.
+	Delete	    free() the "memory" "pointed to" by handle.
+*/
 package hdb
 
 import (
@@ -31,7 +35,7 @@ type Store struct {
 	f *falloc.File
 }
 
-// New returns a newly created Store backed by accessor, discarding it's conents if any.
+// New returns a newly created Store backed by accessor, discarding its conents if any.
 // If successful, methods on the returned Store can be used for I/O.
 // It returns the Store and an os.Error, if any.
 func New(accessor storage.Accessor) (store *Store, err os.Error) {
@@ -93,34 +97,34 @@ func (s *Store) Root() falloc.Handle {
 	return s.f.Root()
 }
 
-// File returns the underlying falloc.File of s.
+// File returns the underlying falloc.File of 's'.
 func (s *Store) File() *falloc.File {
 	return s.f
 }
 
-// Lock locks s for writing. If the lock is already locked for reading or writing,
+// Lock locks 's' for writing. If the lock is already locked for reading or writing,
 // Lock blocks until the lock is available. To ensure that the lock eventually becomes available,
 // a blocked Lock call excludes new readers from acquiring the lock.
 func (s *Store) Lock() {
 	s.f.Lock()
 }
 
-// RLock locks s for reading. If the lock is already locked for writing or there is a writer
+// RLock locks 's' for reading. If the lock is already locked for writing or there is a writer
 // already waiting to release the lock, RLock blocks until the writer has released the lock.
 func (s *Store) RLock() {
 	s.f.RLock()
 }
 
-// Unlock unlocks s for writing. It is a run-time error if f is not locked for writing on entry to Unlock.
+// Unlock unlocks 's' for writing. It's a run-time error if 's' is not locked for writing on entry to Unlock.
 //
 // As with Mutexes, a locked RWMutex is not associated with a particular goroutine.
-// One goroutine may RLock (Lock) s and then arrange for another goroutine to RUnlock (Unlock) it.
+// One goroutine may RLock (Lock) 's' and then arrange for another goroutine to RUnlock (Unlock) it.
 func (s *Store) Unlock() {
 	s.f.Unlock()
 }
 
 // RUnlock undoes a single RLock call; it does not affect other simultaneous readers.
-// It is a run-time error if s is not locked for reading on entry to RUnlock.
+// It's a run-time error if 's' is not locked for reading on entry to RUnlock.
 func (s *Store) RUnlock() {
 	s.f.RUnlock()
 }

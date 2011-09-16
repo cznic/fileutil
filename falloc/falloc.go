@@ -6,7 +6,7 @@
 
 /*
 
-This is an mosttly (WIP) conforming implementation of the "specs" in docs.go.
+This is an mostly (WIP) conforming implementation of the "specs" in docs.go.
 
 The main incompletness is support for only one kind of FTL, though this table kind is still per "specs".
 
