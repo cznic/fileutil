@@ -123,7 +123,7 @@ case Z == 0x01:	The last byte of content is 0xFF
 This block type is used for content of length in 1...237 bytes.  The value of
 the "padding" field, if of non zero length, is undefined.
 
-If the last byte of content is the last byte of an atom (== it's file byte
+If the last byte of content is the last byte of an atom (== its file byte
 offset & 0xF == 0xF) then such last byte MUST be in 0x00...0xFD. 
 
 If the last byte of content is the last byte of an atom AND the last byte of
@@ -143,7 +143,7 @@ be 0x00 (i.e. the used block marker).  Other "tail" values are reserved.
  | 0x00 || undefined || 0x00 | // == used block, other "tail" values reserved.
  +------++-----------++------+
 
-All of the rules for 0x01..0xED applies. Depicted only for it's different
+All of the rules for 0x01..0xED applies. Depicted only for its different
 semantics (e.g. an allocated [existing] string but with length of zero).
 
 ==============================================================================
@@ -213,7 +213,7 @@ have a free lists table item which links free blocks of some bigger size (say
 space used by such free blocks. 
 
 Smaller (<3856 atoms) free blocks can be organized exactly (every distinct size
-has it's table item) or the sizes can run using other schema like e.g. "1, 2,
+has its table item) or the sizes can run using other schema like e.g. "1, 2,
 4, 8, ..." (powers of 2) or "1, 2, 3, 5, 8, 13, ..." (the Fibonacci sequence)
 or they may be fine tuned to a specific usage pattern.
 
@@ -224,7 +224,7 @@ or they may be fine tuned to a specific usage pattern.
 The first block of a file (atom address == file offset == 0) is the file header.
 The header block has the standard layout of a used short non escaped block.
 
-Special conditions apply: The header block and it's content MUST be like this:
+Special conditions apply: The header block and its content MUST be like this:
 
  +------+---------+---------+------+		
  |  0   |  1...7  | 8...14  |  15  |

@@ -294,7 +294,7 @@ func (f *File) extend(b []byte) (handle int64) {
 	return
 }
 
-// Alloc stores b in a newly allocated space and returns it's handle and an os.Error if any.
+// Alloc stores b in a newly allocated space and returns its handle and an os.Error if any.
 func (f *File) Alloc(b []byte) (handle Handle, err os.Error) {
 	defer func() {
 		if e := recover(); e != nil {

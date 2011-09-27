@@ -6,7 +6,7 @@
 
 /*
 WIP: Package hdb provides a "handle"/value DB like store, but actually it's
-closer to the model of a process's virtual memory and it's alloc, free and move
+closer to the model of a process's virtual memory and its alloc, free and move
 methods.
 
 The hdb package is a thin layer around falloc.File providing stable-only
