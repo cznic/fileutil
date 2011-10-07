@@ -12,7 +12,7 @@ file/store (WIP, unstable API).
 Overall structure:
  File == n blocks.
  Block == n atoms.
- Atom == == 16 bytes.
+ Atom == 16 bytes.
 
 x6..x0 == least significant 7 bytes of a 64 bit integer, highest (7th) byte is
 0 and is not stored in the file.

@@ -44,3 +44,31 @@ type Accessor interface {
 	// WriteAt returns a non-nil Error when n != len(b).
 	WriteAt(b []byte, off int64) (n int, err os.Error)
 }
+
+// WIP
+//
+// Acid provides an abstract, simplified ACID (atomicity, consistency,
+// isolation, durability) model over a store (Accessor). This level is intended
+// primairly for structural changes, not for DB data transactions. There is no
+// explicit "commit" and/or "rollback" - a structural "transaction" is assumed
+// to be always finished by an implicit "commit". By implicity here it is meant
+// reaching a zero level of (possibly nested) BeginUpdates and EndUpdates.
+//
+// Before every [structural] change of a store the BeginUpdate is to be called
+// and paired with EndUpdate after the change makes the store's state
+// consistent again. Invokations of BeginUpdate may nest. On invoking the last
+// unnested EndUpdate an implicit "commit" should be performed by the ACID
+// store/provider. The concrete mechanism is unspecified. It could be for
+// example a WAL (write-ahead logging).
+//
+// Tracking of the nesting level is left to the concrete type implementing the
+// Acid interface. Note - such type probably must coordinate the Begin/End
+// Update calls with all methods defined by the Accessor interface.
+//
+// Store providers may return an Accessor which implements Acid. Then the store
+// user may choose to use the additional Acid methods.
+type Acid interface {
+	Accessor
+	BeginUpdate() os.Error
+	EndUpdate() os.Error
+}
