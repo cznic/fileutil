@@ -266,7 +266,7 @@ func (f *File) audit() (usedblocks, totalblocks int64, err os.Error) {
 				panic(fmt.Errorf("bad freetab[%d] item @%#x", size, this))
 			}
 
-			freemap[this] = 0, false
+			delete(freemap, this)
 
 			if sz < int64(size) {
 				panic(fmt.Errorf("bad freetab[%d] item size @%#x %d", size, this, sz))

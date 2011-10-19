@@ -305,7 +305,7 @@ func (c *Cache) cleaner(limit int) {
 				item = c.lru.Front()
 			}
 			if p := item.Value.(*cachepage); !p.dirty {
-				c.m[p.pi] = nil, false
+				delete(c.m, p.pi)
 				c.lru.Remove(item)
 				c.Purge++
 			}
