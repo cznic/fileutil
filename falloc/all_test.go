@@ -48,12 +48,12 @@ func fopen(fn string) (f *File, err os.Error) {
 
 	var advise func(int64, int, bool)
 	if *fadviseFlag {
-		f := store.(*os.File)
-		if err = fileutil.Fadvise(f, 0, 0, fileutil.POSIX_FADV_RANDOM); err != nil {
+		file := store.(*os.File)
+		if err = fileutil.Fadvise(file, 0, 0, fileutil.POSIX_FADV_RANDOM); err != nil {
 			return
 		}
 		advise = func(off int64, len int, write bool) {
-			if err = fileutil.Fadvise(f, off, off+int64(len), fileutil.POSIX_FADV_DONTNEED); err != nil {
+			if err = fileutil.Fadvise(file, off, off+int64(len), fileutil.POSIX_FADV_DONTNEED); err != nil {
 				log.Fatal("advisor advise err", err)
 			}
 		}
@@ -84,12 +84,12 @@ func fcreate(fn string) (f *File, err os.Error) {
 
 	var advise func(int64, int, bool)
 	if *fadviseFlag {
-		f := store.(*os.File)
-		if err = fileutil.Fadvise(f, 0, 0, fileutil.POSIX_FADV_RANDOM); err != nil {
+		file := store.(*os.File)
+		if err = fileutil.Fadvise(file, 0, 0, fileutil.POSIX_FADV_RANDOM); err != nil {
 			return
 		}
 		advise = func(off int64, len int, write bool) {
-			if err = fileutil.Fadvise(f, off, off+int64(len), fileutil.POSIX_FADV_DONTNEED); err != nil {
+			if err = fileutil.Fadvise(file, off, off+int64(len), fileutil.POSIX_FADV_DONTNEED); err != nil {
 				log.Fatal("advisor advise err", err)
 			}
 		}
