@@ -12,7 +12,7 @@ import (
 	"os"
 )
 
-const asserts = true
+const asserts = false
 
 func init() {
 	log.SetFlags(log.Flags() | log.Lshortfile)
