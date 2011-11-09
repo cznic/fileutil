@@ -32,7 +32,7 @@ func openfile(t *testing.T) Accessor {
 }
 
 func readfile(t *testing.T) (b []byte) {
-	var err os.Error
+	var err error
 	if b, err = ioutil.ReadFile(*fFlag); err != nil {
 		t.Fatal("readfile")
 	}
@@ -42,7 +42,7 @@ func readfile(t *testing.T) (b []byte) {
 
 func newcache(t *testing.T) (c *Cache) {
 	f := newfile(t)
-	var err os.Error
+	var err error
 	c, err = NewCache(f, 1<<20, nil)
 	if err != nil {
 		t.Fatal("newCache", err)

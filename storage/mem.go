@@ -8,6 +8,7 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -26,7 +27,7 @@ type memaccessor struct {
 // Recomended for small amounts of data only and content which may be lost on process kill/crash.
 //
 // NewMem return the Accessor or an os.Error of any.
-func NewMem(f *os.File) (store Accessor, err os.Error) {
+func NewMem(f *os.File) (store Accessor, err error) {
 	a := &memaccessor{f: f}
 	if err = f.Truncate(0); err != nil {
 		return
@@ -47,7 +48,7 @@ func NewMem(f *os.File) (store Accessor, err os.Error) {
 // Recomended for small amounts of data only and content which may be lost on process kill/crash.
 //
 // OpenMem return the Accessor or an os.Error of any.
-func OpenMem(f *os.File) (store Accessor, err os.Error) {
+func OpenMem(f *os.File) (store Accessor, err error) {
 	a := &memaccessor{f: f}
 	if a.b, err = ioutil.ReadAll(a.f); err != nil {
 		a.f.Close()
@@ -64,7 +65,7 @@ func OpenMem(f *os.File) (store Accessor, err os.Error) {
 }
 
 // Close implements Accessor. Specifically it synchronizes the memory and file images.
-func (a *memaccessor) Close() (err os.Error) {
+func (a *memaccessor) Close() (err error) {
 	defer func() {
 		a.b = nil
 		if a.f != nil {
@@ -82,7 +83,7 @@ func (a *memaccessor) Name() string {
 	return a.f.Name()
 }
 
-func (a *memaccessor) ReadAt(b []byte, off int64) (n int, err os.Error) {
+func (a *memaccessor) ReadAt(b []byte, off int64) (n int, err error) {
 	if off < 0 || off > math.MaxInt32 {
 		return -1, fmt.Errorf("ReadAt: illegal offset %#x", off)
 	}
@@ -100,7 +101,7 @@ func (a *memaccessor) ReadAt(b []byte, off int64) (n int, err os.Error) {
 	return
 }
 
-func (a *memaccessor) Stat() (fi *os.FileInfo, err os.Error) {
+func (a *memaccessor) Stat() (fi *os.FileInfo, err error) {
 	fi = &os.FileInfo{}
 	*fi = *a.fi
 	fi.Size = int64(len(a.b))
@@ -108,7 +109,7 @@ func (a *memaccessor) Stat() (fi *os.FileInfo, err os.Error) {
 }
 
 // Sync implements Accessor. Specifically it synchronizes the memory and file images.
-func (a *memaccessor) Sync() (err os.Error) {
+func (a *memaccessor) Sync() (err error) {
 	var n int
 	if n, err = a.f.WriteAt(a.b, 0); n != len(a.b) {
 		return
@@ -117,24 +118,24 @@ func (a *memaccessor) Sync() (err os.Error) {
 	return a.f.Truncate(int64(len(a.b)))
 }
 
-func (a *memaccessor) Truncate(size int64) (err os.Error) {
+func (a *memaccessor) Truncate(size int64) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
-			err = e.(os.Error)
+			err = e.(error)
 		}
 	}()
 
 	if size > math.MaxInt32 {
-		panic(os.NewError("truncate: illegal size"))
+		panic(errors.New("truncate: illegal size"))
 	}
 
 	a.b = a.b[:int(size)]
 	return
 }
 
-func (a *memaccessor) WriteAt(b []byte, off int64) (n int, err os.Error) {
+func (a *memaccessor) WriteAt(b []byte, off int64) (n int, err error) {
 	if off < 0 || off > math.MaxInt32 {
-		return -1, os.NewError("WriteAt: illegal offset")
+		return -1, errors.New("WriteAt: illegal offset")
 	}
 
 	rq, fp, size := len(b), int(off), len(a.b)

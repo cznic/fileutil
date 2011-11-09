@@ -40,7 +40,7 @@ func init() {
 	flag.Parse()
 }
 
-func fopen(fn string) (f *File, err os.Error) {
+func fopen(fn string) (f *File, err error) {
 	var store storage.Accessor
 	if store, err = storage.OpenFile(fn, os.O_RDWR, 0666); err != nil {
 		return
@@ -76,7 +76,7 @@ func fopen(fn string) (f *File, err os.Error) {
 	return Open(store)
 }
 
-func fcreate(fn string) (f *File, err os.Error) {
+func fcreate(fn string) (f *File, err error) {
 	var store storage.Accessor
 	if store, err = storage.OpenFile(fn, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666); err != nil {
 		return
@@ -143,10 +143,10 @@ func probed(t *testing.T, f *File) {
 	}
 }
 
-func (f *File) audit() (usedblocks, totalblocks int64, err os.Error) {
+func (f *File) audit() (usedblocks, totalblocks int64, err error) {
 	defer func() {
 		if e := recover(); e != nil {
-			err = e.(os.Error)
+			err = e.(error)
 		}
 	}()
 
@@ -328,7 +328,7 @@ func (f *File) checkPrevNext(fp, prev, next int64) {
 }
 
 func reaudit(t *testing.T, f *File, fn string) (of *File) {
-	var err os.Error
+	var err error
 	if _, _, err := f.audit(); err != nil {
 		t.Fatal(err)
 	}
@@ -1090,7 +1090,7 @@ func TestFreeBlockList2(t *testing.T) {
 var crng *mathutil.FC32
 
 func init() {
-	var err os.Error
+	var err error
 	if crng, err = mathutil.NewFC32(0, math.MaxInt32, true); err != nil {
 		panic(err)
 	}

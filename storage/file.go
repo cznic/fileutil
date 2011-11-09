@@ -15,7 +15,7 @@ import (
 // It opens the named file with specified flag (os.O_RDWR etc.) and perm, (0666 etc.) if applicable.
 // If successful, methods on the returned Accessor can be used for I/O.
 // It returns the Accessor and an Error, if any.
-func NewFile(name string, flag int, perm uint32) (store Accessor, err os.Error) {
+func NewFile(name string, flag int, perm uint32) (store Accessor, err error) {
 	return os.OpenFile(name, flag, perm)
 }
 
@@ -23,6 +23,6 @@ func NewFile(name string, flag int, perm uint32) (store Accessor, err os.Error) 
 // It opens the named file with specified flag (os.O_RDWR etc.) and perm, (0666 etc.) if applicable.
 // If successful, methods on the returned Accessor can be used for I/O.
 // It returns the Accessor and an Error, if any.
-func OpenFile(name string, flag int, perm uint32) (store Accessor, err os.Error) {
+func OpenFile(name string, flag int, perm uint32) (store Accessor, err error) {
 	return os.OpenFile(name, flag, perm)
 }

@@ -23,7 +23,7 @@ type GoMFile struct {
 }
 
 // NewGoMFile return a newly created GoMFile.
-func NewGoMFile(fname string, flag int, perm uint32, delta_ns int64) (m *GoMFile, err os.Error) {
+func NewGoMFile(fname string, flag int, perm uint32, delta_ns int64) (m *GoMFile, err error) {
 	m = &GoMFile{}
 	if m.mfile, err = NewMFile(fname, flag, perm, delta_ns); err != nil {
 		m = nil
@@ -31,7 +31,7 @@ func NewGoMFile(fname string, flag int, perm uint32, delta_ns int64) (m *GoMFile
 	return
 }
 
-func (m *GoMFile) File() (file *os.File, err os.Error) {
+func (m *GoMFile) File() (file *os.File, err error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	return m.mfile.File()
@@ -51,7 +51,7 @@ func (m *GoMFile) SetHandler(h MFileHandler) {
 
 // MFileHandler resolves modifications of File.
 // Possible File context is expected to be a part of the handler's closure.
-type MFileHandler func(*os.File) os.Error
+type MFileHandler func(*os.File) error
 
 // MFile represents an os.File with a guard/handler on change/modification.
 // Example use case is an app with a configuration file which can be modified at any time
@@ -69,7 +69,7 @@ type MFile struct {
 // NewMFile returns a newly created MFile or Error if any.
 // The fname, flag and perm parameters have the same meaning as in os.Open.
 // For meaning of the delta_ns parameter please see the (m *MFile) File() docs.
-func NewMFile(fname string, flag int, perm uint32, delta_ns int64) (m *MFile, err os.Error) {
+func NewMFile(fname string, flag int, perm uint32, delta_ns int64) (m *MFile, err error) {
 	m = &MFile{}
 	var secs, nsecs int64
 	if secs, nsecs, err = os.Time(); err != nil {
@@ -109,7 +109,7 @@ func (m *MFile) SetHandler(h MFileHandler) {
 // change/modification. For delta_ns == 0 the modification is checked w/o getting os.Time().
 // If a change is detected a handler is invoked on the MFile file.
 // Any of these steps can produce an Error. If that happens the function returns nil, Error.
-func (m *MFile) File() (file *os.File, err os.Error) {
+func (m *MFile) File() (file *os.File, err error) {
 	var now int64
 
 	mustCheck := m.delta == 0
@@ -148,7 +148,7 @@ func (m *MFile) File() (file *os.File, err os.Error) {
 // Read reads buf from r. It will either fill the full buf or fail.
 // It wraps the functionality of an io.Reader which may return less bytes than requested,
 // but may block if not all data are ready for the io.Reader.
-func Read(r io.Reader, buf []byte) (err os.Error) {
+func Read(r io.Reader, buf []byte) (err error) {
 	have := 0
 	remain := len(buf)
 	got := 0
@@ -181,7 +181,7 @@ const (
 
 // Fadvise predeclares an access pattern for file data.
 // See also 'man 2 posix_fadvise'.
-func Fadvise(f *os.File, off, len int64, advice FadviseAdvice) (err os.Error) {
+func Fadvise(f *os.File, off, len int64, advice FadviseAdvice) (err error) {
 	_, _, errno := syscall.Syscall6(
 		syscall.SYS_FADVISE64,
 		uintptr(f.Fd()),

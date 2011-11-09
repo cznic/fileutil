@@ -9,6 +9,7 @@ package storage
 
 import (
 	"container/list"
+	"io"
 	"math"
 	"os"
 	"sync"
@@ -109,7 +110,7 @@ type Cache struct {
 //
 // The LRU mechanism is used, so the cache tries to keep often accessed pages cached.
 //
-func NewCache(store Accessor, maxcache int64, advise func(int64, int, bool)) (c *Cache, err os.Error) {
+func NewCache(store Accessor, maxcache int64, advise func(int64, int, bool)) (c *Cache, err error) {
 	var fi *os.FileInfo
 	if fi, err = store.Stat(); err != nil {
 		return
@@ -142,7 +143,7 @@ func (c *Cache) Accessor() Accessor {
 	return c.f
 }
 
-func (c *Cache) Close() (err os.Error) {
+func (c *Cache) Close() (err error) {
 	close(c.write)
 	<-c.close
 	close(c.clean)
@@ -154,7 +155,7 @@ func (c *Cache) Name() (s string) {
 	return c.f.Name()
 }
 
-func (c *Cache) ReadAt(b []byte, off int64) (n int, err os.Error) {
+func (c *Cache) ReadAt(b []byte, off int64) (n int, err error) {
 	po := int(off) & 0x1ff
 	bp := 0
 	rem := len(b)
@@ -164,7 +165,7 @@ func (c *Cache) ReadAt(b []byte, off int64) (n int, err os.Error) {
 		p, ok := c.rd(off, true)
 		if !ok {
 			c.lock.Unlock() // X1-
-			return -1, os.EOF
+			return -1, io.EOF
 		}
 
 		rq := rem
@@ -173,7 +174,7 @@ func (c *Cache) ReadAt(b []byte, off int64) (n int, err os.Error) {
 		}
 		if n := copy(b[bp:bp+rq], p.b[po:p.valid]); n != rq {
 			c.lock.Unlock() // X1-
-			return -1, os.EOF
+			return -1, io.EOF
 		}
 
 		m = len(c.m)
@@ -193,7 +194,7 @@ func (c *Cache) ReadAt(b []byte, off int64) (n int, err os.Error) {
 	return
 }
 
-func (c *Cache) Stat() (fi *os.FileInfo, err os.Error) {
+func (c *Cache) Stat() (fi *os.FileInfo, err error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	fi, err = c.f.Stat() //TODO cache it?
@@ -201,13 +202,13 @@ func (c *Cache) Stat() (fi *os.FileInfo, err os.Error) {
 	return
 }
 
-func (c *Cache) Sync() (err os.Error) {
+func (c *Cache) Sync() (err error) {
 	c.write <- false
 	<-c.sync
 	return
 }
 
-func (c *Cache) Truncate(size int64) (err os.Error) {
+func (c *Cache) Truncate(size int64) (err error) {
 	c.Sync() //TODO improve (discard pages, the writer goroutine should also be aware, ...)
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -215,7 +216,7 @@ func (c *Cache) Truncate(size int64) (err os.Error) {
 	return c.f.Truncate(size)
 }
 
-func (c *Cache) WriteAt(b []byte, off int64) (n int, err os.Error) {
+func (c *Cache) WriteAt(b []byte, off int64) (n int, err error) {
 	po := int(off) & 0x1ff
 	bp := 0
 	rem := len(b)

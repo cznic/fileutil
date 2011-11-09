@@ -28,7 +28,6 @@ package hdb
 import (
 	"github.com/cznic/fileutil/falloc"
 	"github.com/cznic/fileutil/storage"
-	"os"
 )
 
 type Store struct {
@@ -38,7 +37,7 @@ type Store struct {
 // New returns a newly created Store backed by accessor, discarding its conents if any.
 // If successful, methods on the returned Store can be used for I/O.
 // It returns the Store and an os.Error, if any.
-func New(accessor storage.Accessor) (store *Store, err os.Error) {
+func New(accessor storage.Accessor) (store *Store, err error) {
 	s := &Store{}
 	if s.f, err = falloc.New(accessor); err == nil {
 		store = s
@@ -49,7 +48,7 @@ func New(accessor storage.Accessor) (store *Store, err os.Error) {
 // Open opens the Store from accessor.
 // If successful, methods on the returned Store can be used for data exchange.
 // It returns the Store and an os.Error, if any.
-func Open(accessor storage.Accessor) (store *Store, err os.Error) {
+func Open(accessor storage.Accessor) (store *Store, err error) {
 	s := &Store{}
 	if s.f, err = falloc.Open(accessor); err == nil {
 		store = s
@@ -59,7 +58,7 @@ func Open(accessor storage.Accessor) (store *Store, err os.Error) {
 
 // Close closes the store. Further access to the store has undefined behavior and may panic.
 // It returns an os.Error, if any.
-func (s *Store) Close() (err os.Error) {
+func (s *Store) Close() (err error) {
 	defer func() {
 		s.f = nil
 	}()
@@ -69,25 +68,25 @@ func (s *Store) Close() (err os.Error) {
 
 // Delete deletes the data associated with handle.
 // It returns an os.Error if any.
-func (s *Store) Delete(handle falloc.Handle) (err os.Error) {
+func (s *Store) Delete(handle falloc.Handle) (err error) {
 	return s.f.Free(handle)
 }
 
 // Get gets the data associated with handle.
 // It returns the data and an os.Error, if any.
-func (s *Store) Get(handle falloc.Handle) (b []byte, err os.Error) {
+func (s *Store) Get(handle falloc.Handle) (b []byte, err error) {
 	return s.f.Read(handle)
 }
 
 // New associates data with a new handle.
 // It returns the handle and an os.Error, if any.
-func (s *Store) New(b []byte) (handle falloc.Handle, err os.Error) {
+func (s *Store) New(b []byte) (handle falloc.Handle, err error) {
 	return s.f.Alloc(b)
 }
 
 // Set associates data with an existing handle.
 // It returns an os.Error, if any.
-func (s *Store) Set(handle falloc.Handle, b []byte) (err os.Error) {
+func (s *Store) Set(handle falloc.Handle, b []byte) (err error) {
 	_, err = s.f.Realloc(handle, b, true)
 	return
 }
@@ -130,22 +129,22 @@ func (s *Store) RUnlock() {
 }
 
 // LockedNew wraps New in a Lock/Unlock pair.
-func (s *Store) LockedNew(b []byte) (handle falloc.Handle, err os.Error) {
+func (s *Store) LockedNew(b []byte) (handle falloc.Handle, err error) {
 	return s.f.LockedAlloc(b)
 }
 
 // LockedDelete wraps Delete in a Lock/Unlock pair.
-func (s *Store) LockedDelete(handle falloc.Handle) (err os.Error) {
+func (s *Store) LockedDelete(handle falloc.Handle) (err error) {
 	return s.f.LockedFree(handle)
 }
 
 // LockedGet wraps Get in a RLock/RUnlock pair.
-func (s *Store) LockedGet(handle falloc.Handle) (b []byte, err os.Error) {
+func (s *Store) LockedGet(handle falloc.Handle) (b []byte, err error) {
 	return s.f.LockedRead(handle)
 }
 
 // LockedSet wraps Set in a Lock/Unlock pair.
-func (s *Store) LockedSet(handle falloc.Handle, b []byte) (err os.Error) {
+func (s *Store) LockedSet(handle falloc.Handle, b []byte) (err error) {
 	_, err = s.f.Realloc(handle, b, true)
 	return
 }

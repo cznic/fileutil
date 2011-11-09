@@ -7,10 +7,7 @@
 
 package falloc
 
-import (
-	"fmt"
-	"os"
-)
+import "fmt"
 
 // EBadRequest is an error produced for invalid operation, e.g. for data of more than maximum allowed.
 type EBadRequest struct {
@@ -18,17 +15,17 @@ type EBadRequest struct {
 	Size int
 }
 
-func (e *EBadRequest) String() string {
+func (e *EBadRequest) Error() string {
 	return fmt.Sprintf("%s: size %d", e.Name, e.Size)
 }
 
 // EClose is a file/store close error.
 type EClose struct {
 	Name string
-	Err  os.Error
+	Err  error
 }
 
-func (e *EClose) String() string {
+func (e *EClose) Error() string {
 	return fmt.Sprintf("%sx: %s", e.Name, e.Err)
 }
 
@@ -38,17 +35,17 @@ type ECorrupted struct {
 	Ofs  int64
 }
 
-func (e *ECorrupted) String() string {
+func (e *ECorrupted) Error() string {
 	return fmt.Sprintf("%s: corrupted data @%#x", e.Name, e.Ofs)
 }
 
 // ECreate is a file/store create error.
 type ECreate struct {
 	Name string
-	Err  os.Error
+	Err  error
 }
 
-func (e *ECreate) String() string {
+func (e *ECreate) Error() string {
 	return fmt.Sprintf("%s: %s", e.Name, e.Err)
 }
 
@@ -59,7 +56,7 @@ type EFreeList struct {
 	Block int64
 }
 
-func (e *EFreeList) String() string {
+func (e *EFreeList) Error() string {
 	return fmt.Sprintf("%s: invalid free list item, size %#x, block %#x", e.Name, e.Size, e.Block)
 }
 
@@ -69,7 +66,7 @@ type EHandle struct {
 	Handle Handle
 }
 
-func (e EHandle) String() string {
+func (e EHandle) Error() string {
 	return fmt.Sprintf("%s: invalid handle %#x", e.Name, e.Handle)
 }
 
@@ -80,24 +77,24 @@ type EHeader struct {
 	Expected []byte
 }
 
-func (e *EHeader) String() string {
+func (e *EHeader) Error() string {
 	return fmt.Sprintf("%s: invalid header, got [% x], expected [% x]", e.Name, e.Header, e.Expected)
 }
 
 // ENullHandle is a file/store access error via a null handle.
 type ENullHandle string
 
-func (e ENullHandle) String() string {
+func (e ENullHandle) Error() string {
 	return fmt.Sprintf("%s: access via null handle", e)
 }
 
 // EOpen is a file/store open error.
 type EOpen struct {
 	Name string
-	Err  os.Error
+	Err  error
 }
 
-func (e *EOpen) String() string {
+func (e *EOpen) Error() string {
 	return fmt.Sprintf("%s: %s", e.Name, e.Err)
 }
 
@@ -105,10 +102,10 @@ func (e *EOpen) String() string {
 type ERead struct {
 	Name string
 	Ofs  int64
-	Err  os.Error
+	Err  error
 }
 
-func (e *ERead) String() string {
+func (e *ERead) Error() string {
 	return fmt.Sprintf("%s, %#x: %s", e.Name, e.Ofs, e.Err)
 }
 
@@ -118,7 +115,7 @@ type ESize struct {
 	Size int64
 }
 
-func (e *ESize) String() string {
+func (e *ESize) Error() string {
 	return fmt.Sprintf("%s: invalid size %#x(%d), size %%16 != 0", e.Name, e.Size, e.Size)
 }
 
@@ -126,9 +123,9 @@ func (e *ESize) String() string {
 type EWrite struct {
 	Name string
 	Ofs  int64
-	Err  os.Error
+	Err  error
 }
 
-func (e *EWrite) String() string {
+func (e *EWrite) Error() string {
 	return fmt.Sprintf("%s, %#x: %s", e.Name, e.Ofs, e.Err)
 }

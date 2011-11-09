@@ -7,10 +7,7 @@
 
 package storage
 
-import (
-	"os"
-	"sync/atomic"
-)
+import "sync/atomic"
 
 // Probe collects usage statistics of the embeded Accessor.
 // Probe itself IS an Accessor.
@@ -49,7 +46,7 @@ func (p *Probe) Reset() {
 	reset(&p.SectorsWr)
 }
 
-func (p *Probe) ReadAt(b []byte, off int64) (n int, err os.Error) {
+func (p *Probe) ReadAt(b []byte, off int64) (n int, err error) {
 	n, err = p.Accessor.ReadAt(b, off)
 	atomic.AddInt64(&p.OpsRd, 1)
 	atomic.AddInt64(&p.BytesRd, int64(n))
@@ -63,7 +60,7 @@ func (p *Probe) ReadAt(b []byte, off int64) (n int, err os.Error) {
 	return
 }
 
-func (p *Probe) WriteAt(b []byte, off int64) (n int, err os.Error) {
+func (p *Probe) WriteAt(b []byte, off int64) (n int, err error) {
 	n, err = p.Accessor.WriteAt(b, off)
 	atomic.AddInt64(&p.OpsWr, 1)
 	atomic.AddInt64(&p.BytesWr, int64(n))

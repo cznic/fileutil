@@ -19,7 +19,6 @@ import (
 	"github.com/cznic/fileutil/storage"
 	"fmt"
 	"log"
-	"os"
 	"sync"
 )
 
@@ -88,11 +87,11 @@ var ( // R/O
 
 // New returns a new File backed by store or an os.Error if any.
 // Any existing data in store are discarded.
-func New(store storage.Accessor) (f *File, err os.Error) {
+func New(store storage.Accessor) (f *File, err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			f = nil
-			err = e.(os.Error)
+			err = e.(error)
 		}
 	}()
 
@@ -123,11 +122,11 @@ func New(store storage.Accessor) (f *File, err os.Error) {
 
 // Open returns a new File backed by store or an os.Error if any.
 // Store already has to be in a valid format.
-func Open(store storage.Accessor) (f *File, err os.Error) {
+func Open(store storage.Accessor) (f *File, err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			f = nil
-			err = e.(os.Error)
+			err = e.(error)
 		}
 	}()
 
@@ -173,7 +172,7 @@ func (f *File) Accessor() storage.Accessor {
 }
 
 // Close closes f and returns an os.Error if any.
-func (f *File) Close() (err os.Error) {
+func (f *File) Close() (err error) {
 	if asserts && (f.f == nil) {
 		panic("assert fail")
 	}
@@ -295,11 +294,11 @@ func (f *File) extend(b []byte) (handle int64) {
 }
 
 // Alloc stores b in a newly allocated space and returns its handle and an os.Error if any.
-func (f *File) Alloc(b []byte) (handle Handle, err os.Error) {
+func (f *File) Alloc(b []byte) (handle Handle, err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			handle = INVALID_HANDLE
-			err = e.(os.Error)
+			err = e.(error)
 		}
 	}()
 
@@ -489,11 +488,11 @@ func (f *File) makeFree(prev, atom, atoms, next int64) {
 // Read reads and return the data associated with handle and an os.Error if any.
 // Passing an invalid handle to Read may return invalid data without error.
 // It's like getting garbage via passing an invalid pointer to C.memcopy().
-func (f *File) Read(handle Handle) (b []byte, err os.Error) {
+func (f *File) Read(handle Handle) (b []byte, err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			b = nil
-			err = e.(os.Error)
+			err = e.(error)
 		}
 	}()
 
@@ -512,10 +511,10 @@ func (f *File) Read(handle Handle) (b []byte, err os.Error) {
 // handle to Free or reusing handle afterwards will probably corrupt the database or provide
 // invalid data on Read. It's like corrupting memory via passing an invalid pointer to C.free()
 // or reusing that pointer.
-func (f *File) Free(handle Handle) (err os.Error) {
+func (f *File) Free(handle Handle) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
-			err = e.(os.Error)
+			err = e.(error)
 		}
 	}()
 
@@ -561,11 +560,11 @@ func (f *File) Free(handle Handle) (err os.Error) {
 // with handle. If !keepHandle && newhandle != handle then reusing handle will probably corrupt
 // the database.
 // The above effects are like corrupting memory/data via passing an invalid pointer to C.realloc().
-func (f *File) Realloc(handle Handle, b []byte, keepHandle bool) (newhandle Handle, err os.Error) {
+func (f *File) Realloc(handle Handle, b []byte, keepHandle bool) (newhandle Handle, err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			newhandle = INVALID_HANDLE
-			err = e.(os.Error)
+			err = e.(error)
 		}
 	}()
 
@@ -685,28 +684,28 @@ func (f *File) RUnlock() {
 }
 
 // LockedAlloc wraps Alloc in a Lock/Unlock pair.
-func (f *File) LockedAlloc(b []byte) (handle Handle, err os.Error) {
+func (f *File) LockedAlloc(b []byte) (handle Handle, err error) {
 	f.Lock()
 	defer f.Unlock()
 	return f.Alloc(b)
 }
 
 // LockedFree wraps Free in a Lock/Unlock pair.
-func (f *File) LockedFree(handle Handle) (err os.Error) {
+func (f *File) LockedFree(handle Handle) (err error) {
 	f.Lock()
 	defer f.Unlock()
 	return f.Free(handle)
 }
 
 // LockedRead wraps Read in a RLock/RUnlock pair.
-func (f *File) LockedRead(handle Handle) (b []byte, err os.Error) {
+func (f *File) LockedRead(handle Handle) (b []byte, err error) {
 	f.RLock()
 	defer f.RUnlock()
 	return f.Read(handle)
 }
 
 // LockedRealloc wraps Realloc in a Lock/Unlock pair.
-func (f *File) LockedRealloc(handle Handle, b []byte, keepHandle bool) (newhandle Handle, err os.Error) {
+func (f *File) LockedRealloc(handle Handle, b []byte, keepHandle bool) (newhandle Handle, err error) {
 	f.Lock()
 	defer f.Unlock()
 	return f.Realloc(handle, b, keepHandle)
