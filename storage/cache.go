@@ -106,7 +106,7 @@ type Cache struct {
 }
 
 // NewCache creates a caching Accessor from store with total of maxcache bytes.
-// NewCache returns the new Cache, implementing Accessor or an os.Error if any.
+// NewCache returns the new Cache, implementing Accessor or an error if any.
 //
 // The LRU mechanism is used, so the cache tries to keep often accessed pages cached.
 //

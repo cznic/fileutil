@@ -26,7 +26,7 @@ type memaccessor struct {
 // The memory and file images are synced only by Sync and Close.
 // Recomended for small amounts of data only and content which may be lost on process kill/crash.
 //
-// NewMem return the Accessor or an os.Error of any.
+// NewMem return the Accessor or an error of any.
 func NewMem(f *os.File) (store Accessor, err error) {
 	a := &memaccessor{f: f}
 	if err = f.Truncate(0); err != nil {
@@ -47,7 +47,7 @@ func NewMem(f *os.File) (store Accessor, err error) {
 // The memory and file images are synced only Sync and Close.
 // Recomended for small amounts of data only and content which may be lost on process kill/crash.
 //
-// OpenMem return the Accessor or an os.Error of any.
+// OpenMem return the Accessor or an error of any.
 func OpenMem(f *os.File) (store Accessor, err error) {
 	a := &memaccessor{f: f}
 	if a.b, err = ioutil.ReadAll(a.f); err != nil {

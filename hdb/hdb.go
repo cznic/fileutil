@@ -36,7 +36,7 @@ type Store struct {
 
 // New returns a newly created Store backed by accessor, discarding its conents if any.
 // If successful, methods on the returned Store can be used for I/O.
-// It returns the Store and an os.Error, if any.
+// It returns the Store and an error, if any.
 func New(accessor storage.Accessor) (store *Store, err error) {
 	s := &Store{}
 	if s.f, err = falloc.New(accessor); err == nil {
@@ -47,7 +47,7 @@ func New(accessor storage.Accessor) (store *Store, err error) {
 
 // Open opens the Store from accessor.
 // If successful, methods on the returned Store can be used for data exchange.
-// It returns the Store and an os.Error, if any.
+// It returns the Store and an error, if any.
 func Open(accessor storage.Accessor) (store *Store, err error) {
 	s := &Store{}
 	if s.f, err = falloc.Open(accessor); err == nil {
@@ -57,7 +57,7 @@ func Open(accessor storage.Accessor) (store *Store, err error) {
 }
 
 // Close closes the store. Further access to the store has undefined behavior and may panic.
-// It returns an os.Error, if any.
+// It returns an error, if any.
 func (s *Store) Close() (err error) {
 	defer func() {
 		s.f = nil
@@ -67,25 +67,25 @@ func (s *Store) Close() (err error) {
 }
 
 // Delete deletes the data associated with handle.
-// It returns an os.Error if any.
+// It returns an error if any.
 func (s *Store) Delete(handle falloc.Handle) (err error) {
 	return s.f.Free(handle)
 }
 
 // Get gets the data associated with handle.
-// It returns the data and an os.Error, if any.
+// It returns the data and an error, if any.
 func (s *Store) Get(handle falloc.Handle) (b []byte, err error) {
 	return s.f.Read(handle)
 }
 
 // New associates data with a new handle.
-// It returns the handle and an os.Error, if any.
+// It returns the handle and an error, if any.
 func (s *Store) New(b []byte) (handle falloc.Handle, err error) {
 	return s.f.Alloc(b)
 }
 
 // Set associates data with an existing handle.
-// It returns an os.Error, if any.
+// It returns an error, if any.
 func (s *Store) Set(handle falloc.Handle, b []byte) (err error) {
 	_, err = s.f.Realloc(handle, b, true)
 	return

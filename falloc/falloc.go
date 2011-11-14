@@ -85,7 +85,7 @@ var ( // R/O
 	zero7 = make([]byte, 7)
 )
 
-// New returns a new File backed by store or an os.Error if any.
+// New returns a new File backed by store or an error if any.
 // Any existing data in store are discarded.
 func New(store storage.Accessor) (f *File, err error) {
 	defer func() {
@@ -120,7 +120,7 @@ func New(store storage.Accessor) (f *File, err error) {
 	return
 }
 
-// Open returns a new File backed by store or an os.Error if any.
+// Open returns a new File backed by store or an error if any.
 // Store already has to be in a valid format.
 func Open(store storage.Accessor) (f *File, err error) {
 	defer func() {
@@ -171,7 +171,7 @@ func (f *File) Accessor() storage.Accessor {
 	return f.f
 }
 
-// Close closes f and returns an os.Error if any.
+// Close closes f and returns an error if any.
 func (f *File) Close() (err error) {
 	if asserts && (f.f == nil) {
 		panic("assert fail")
@@ -293,7 +293,7 @@ func (f *File) extend(b []byte) (handle int64) {
 	return
 }
 
-// Alloc stores b in a newly allocated space and returns its handle and an os.Error if any.
+// Alloc stores b in a newly allocated space and returns its handle and an error if any.
 func (f *File) Alloc(b []byte) (handle Handle, err error) {
 	defer func() {
 		if e := recover(); e != nil {
@@ -485,7 +485,7 @@ func (f *File) makeFree(prev, atom, atoms, next int64) {
 	f.write(b[15:], fp+atoms<<4-8)
 }
 
-// Read reads and return the data associated with handle and an os.Error if any.
+// Read reads and return the data associated with handle and an error if any.
 // Passing an invalid handle to Read may return invalid data without error.
 // It's like getting garbage via passing an invalid pointer to C.memcopy().
 func (f *File) Read(handle Handle) (b []byte, err error) {
@@ -507,7 +507,7 @@ func (f *File) Read(handle Handle) (b []byte, err error) {
 	return
 }
 
-// Free frees space associated with handle and returns an os.Error if any. Passing an invalid
+// Free frees space associated with handle and returns an error if any. Passing an invalid
 // handle to Free or reusing handle afterwards will probably corrupt the database or provide
 // invalid data on Read. It's like corrupting memory via passing an invalid pointer to C.free()
 // or reusing that pointer.
@@ -555,7 +555,7 @@ func (f *File) Free(handle Handle) (err error) {
 }
 
 // Realloc reallocates space associted with handle to acomodate b, returns the newhandle
-// newly associated with b and an os.Error if any. If keepHandle == true then Realloc guarantees
+// newly associated with b and an error if any. If keepHandle == true then Realloc guarantees
 // newhandle == handle even if the new data are larger then the previous content associated
 // with handle. If !keepHandle && newhandle != handle then reusing handle will probably corrupt
 // the database.

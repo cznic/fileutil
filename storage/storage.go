@@ -23,16 +23,16 @@ func init() {
 
 // Accessor provides I/O methods to access a store.
 type Accessor interface {
-	// Close closes the store, rendering it unusable for I/O. It returns an os.Error, if any.
+	// Close closes the store, rendering it unusable for I/O. It returns an error, if any.
 	Close() error
 	// Name returns the name of the file as presented to Open.
 	Name() string
 	// ReadAt reads len(b) bytes from the store starting at byte offset off.
-	// It returns the number of bytes read and the os.Error, if any.
+	// It returns the number of bytes read and the error, if any.
 	// EOF is signaled by a zero count with err set to os.EOF.
 	// ReadAt always returns a non-nil Error when n != len(b).
 	ReadAt(b []byte, off int64) (n int, err error)
-	// Stat returns the FileInfo structure describing the store. It returns the os.FileInfo and an os.Error, if any.
+	// Stat returns the FileInfo structure describing the store. It returns the os.FileInfo and an error, if any.
 	Stat() (fi *os.FileInfo, err error)
 	// Sync commits the current contents of the store to stable storage.
 	// Typically, this means flushing the file system's in-memory copy of recently written data to disk.
@@ -40,7 +40,7 @@ type Accessor interface {
 	// Truncate changes the size of the store. It does not change the I/O offset.
 	Truncate(size int64) error
 	// WriteAt writes len(b) bytes to the store starting at byte offset off.
-	// It returns the number of bytes written and an os.Error, if any.
+	// It returns the number of bytes written and an error, if any.
 	// WriteAt returns a non-nil Error when n != len(b).
 	WriteAt(b []byte, off int64) (n int, err error)
 }
