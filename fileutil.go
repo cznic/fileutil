@@ -189,5 +189,5 @@ func Fadvise(f *os.File, off, len int64, advice FadviseAdvice) (err error) {
 		uintptr(len),
 		uintptr(advice),
 		0, 0)
-	return os.NewSyscallError("SYS_FADVISE64", int(errno))
+	return os.NewSyscallError("SYS_FADVISE64", errno)
 }
