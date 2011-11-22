@@ -17,7 +17,6 @@ package falloc
 import (
 	"bytes"
 	"github.com/cznic/fileutil/storage"
-	"fmt"
 	"log"
 	"sync"
 )
@@ -67,7 +66,6 @@ type File struct {
 
 func (f *File) read(b []byte, off int64) {
 	if n, err := f.f.ReadAt(b, off); n != len(b) {
-		fmt.Printf("falloc.read(%d) @ %#x, got n = %d, err %s\n", len(b), off, n, err)
 		panic(&ERead{f.f.Name(), off, err})
 	}
 }
