@@ -10,6 +10,7 @@ package storage
 import (
 	"log"
 	"os"
+	"time"
 )
 
 const asserts = false
@@ -19,6 +20,47 @@ func init() {
 	if asserts {
 		log.Print("assertions enabled")
 	}
+}
+
+// FileInfo is a type implementing os.FileInfo which has setable fields, like
+// the older os.FileInfo used to have. It is needed when e.g. the Size is to be
+// faked (encapsulated/memory only file, file cache, etc.).
+type FileInfo struct {
+	FName    string      // base name of the file
+	FSize    int64       // length in bytes
+	FMode    os.FileMode // file mode bits
+	FModTime time.Time   // modification time
+	FIsDir   bool        // abbreviation for Mode().IsDir()
+}
+
+// NewFileInfo creates FileInfo from os.FileInfo fi.
+func NewFileInfo(fi os.FileInfo) *FileInfo {
+	return &FileInfo{fi.Name(), fi.Size(), fi.Mode(), fi.ModTime(), fi.IsDir()}
+}
+
+// Implementation of os.FileInfo
+func (fi *FileInfo) Name() string {
+	return fi.FName
+}
+
+// Implementation of os.FileInfo
+func (fi *FileInfo) Size() int64 {
+	return fi.FSize
+}
+
+// Implementation of os.FileInfo
+func (fi *FileInfo) Mode() os.FileMode {
+	return fi.FMode
+}
+
+// Implementation of os.FileInfo
+func (fi *FileInfo) ModTime() time.Time {
+	return fi.FModTime
+}
+
+// Implementation of os.FileInfo
+func (fi *FileInfo) IsDir() bool {
+	return fi.FIsDir
 }
 
 // Accessor provides I/O methods to access a store.
@@ -33,7 +75,7 @@ type Accessor interface {
 	// ReadAt always returns a non-nil Error when n != len(b).
 	ReadAt(b []byte, off int64) (n int, err error)
 	// Stat returns the FileInfo structure describing the store. It returns the os.FileInfo and an error, if any.
-	Stat() (fi *os.FileInfo, err error)
+	Stat() (fi os.FileInfo, err error)
 	// Sync commits the current contents of the store to stable storage.
 	// Typically, this means flushing the file system's in-memory copy of recently written data to disk.
 	Sync() (err error)

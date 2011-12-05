@@ -127,13 +127,13 @@ func testBenchAlloc(t *testing.T, n, block int) (dt int64) {
 	if n >= 1000 {
 		perc = n / 1000
 	}
-	dt = time.Nanoseconds()
+	dt = time.Now().UnixNano()
 	if probe, ok := f.Accessor().(*storage.Probe); ok {
 		probe.Reset()
 	}
 	for i := 0; i < n; i++ {
 		if i != 0 && i%perc == 0 {
-			ut := float64((time.Nanoseconds() - dt) / 1e9)
+			ut := float64((time.Now().UnixNano() - dt) / 1e9)
 			q := float64(i) / float64(n)
 			rt := ut/q - ut
 			print("w ", (1000*uint64(i))/uint64(n), " eta ", int(rt/60), ":", int(rt)%60, "              \r")
@@ -142,7 +142,7 @@ func testBenchAlloc(t *testing.T, n, block int) (dt int64) {
 			panic(err)
 		}
 	}
-	return time.Nanoseconds() - dt
+	return time.Now().UnixNano() - dt
 }
 
 func TestDevBenchAlloc(t *testing.T) {
@@ -178,10 +178,10 @@ func testBenchRead(t *testing.T, n, block int) (dt int64) {
 	}
 	h := make([]Handle, n)
 	b := make([]byte, block)
-	dt = time.Nanoseconds()
+	dt = time.Now().UnixNano()
 	for i := 0; i < n; i++ {
 		if i != 0 && i%perc == 0 {
-			ut := float64((time.Nanoseconds() - dt) / 1e9)
+			ut := float64((time.Now().UnixNano() - dt) / 1e9)
 			q := float64(i) / float64(n)
 			rt := ut/q - ut
 			print("w ", (1000*uint64(i))/uint64(n), " eta ", int(rt/60), ":", int(rt)%60, "              \r")
@@ -195,10 +195,10 @@ func testBenchRead(t *testing.T, n, block int) (dt int64) {
 	if probe, ok := f.Accessor().(*storage.Probe); ok {
 		probe.Reset()
 	}
-	dt = time.Nanoseconds()
+	dt = time.Now().UnixNano()
 	for i := 0; i < n; i++ {
 		if i != 0 && i%perc == 0 {
-			ut := float64((time.Nanoseconds() - dt) / 1e9)
+			ut := float64((time.Now().UnixNano() - dt) / 1e9)
 			q := float64(i) / float64(n)
 			rt := ut/q - ut
 			print("r ", (1000*uint64(i))/uint64(n), " eta ", int(rt/60), ":", int(rt)%60, "              \r")
@@ -207,7 +207,7 @@ func testBenchRead(t *testing.T, n, block int) (dt int64) {
 			t.Fatal(70, err)
 		}
 	}
-	dt = time.Nanoseconds() - dt
+	dt = time.Now().UnixNano() - dt
 
 	f.Accessor().Sync()
 	probed(t, f)
@@ -271,13 +271,13 @@ func testBenchReadRnd(t *testing.T, n, block int) (dt int64) {
 	if n >= 1000 {
 		perc = n / 1000
 	}
-	t0 := time.Nanoseconds()
+	t0 := time.Now().UnixNano()
 	for i := 0; i < n; i++ {
 		if h[i], err = f.Alloc(b); err != nil {
 			t.Fatal(40, err)
 		}
 		if i != 0 && i%perc == 0 {
-			dt := float64((time.Nanoseconds() - t0) / 1e9)
+			dt := float64((time.Now().UnixNano() - t0) / 1e9)
 			q := float64(i) / float64(n)
 			rt := dt/q - dt
 			print("w ", (1000*uint64(i))/uint64(n), " eta ", int(rt/60), ":", int(rt)%60, "              \r")
@@ -290,23 +290,23 @@ func testBenchReadRnd(t *testing.T, n, block int) (dt int64) {
 	println("\nsync")
 	f.Accessor().Sync()
 	println("synced")
-	t0 = time.Nanoseconds()
+	t0 = time.Now().UnixNano()
 	for i := 0; i < n; i++ {
 		if _, err := f.Read(h[rng.Next()]); err != nil {
 			t.Fatal(80, err)
 		}
 		if i != 0 && i%perc == 0 {
-			dt := float64((time.Nanoseconds() - t0) / 1e9)
+			dt := float64((time.Now().UnixNano() - t0) / 1e9)
 			q := float64(i) / float64(n)
 			rt := dt/q - dt
 			print("r ", (1000*uint64(i))/uint64(n), " eta ", int(rt/60), ":", int(rt)%60, "                   \r")
 		}
 	}
 	println()
-	dt = time.Nanoseconds() - t0
+	dt = time.Now().UnixNano() - t0
 	if c, ok := f.Accessor().(*storage.Cache); ok {
 		x, _ := c.Stat()
-		t.Logf("Cache rq %10d, load %10d, purge %10d, top %10d, fs %10d", c.Rq, c.Load, c.Purge, c.Top, x.Size)
+		t.Logf("Cache rq %10d, load %10d, purge %10d, top %10d, fs %10d", c.Rq, c.Load, c.Purge, c.Top, x.Size())
 	}
 	return
 }

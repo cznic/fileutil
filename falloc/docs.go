@@ -17,9 +17,9 @@ Overall structure:
 x6..x0 == least significant 7 bytes of a 64 bit integer, highest (7th) byte is
 0 and is not stored in the file.
 
-==============================================================================
+Block first byte
 
-* Block first byte (Block type tag) *
+Aka block type tag.
 
 ------------------------------------------------------------------------------
 
@@ -148,7 +148,7 @@ semantics (e.g. an allocated [existing] string but with length of zero).
 
 ==============================================================================
 
-* Block last byte *
+Block last byte
 
 ------------------------------------------------------------------------------
 
@@ -172,7 +172,7 @@ Layout at start of this block - see "Block first byte": FE.
 
 ==============================================================================
 
-* Free lists table *
+Free lists table
 
 The free lists table content is stored in the standard layout of a used block.
 
@@ -219,7 +219,7 @@ or they may be fine tuned to a specific usage pattern.
 
 ==============================================================================
 
-* Header *
+Header
 
 The first block of a file (atom address == file offset == 0) is the file header.
 The header block has the standard layout of a used short non escaped block.

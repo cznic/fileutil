@@ -81,12 +81,12 @@ func NewMFile(fname string, flag int, perm uint32, delta_ns int64) (m *MFile, er
 		return
 	}
 
-	var fi *os.FileInfo
+	var fi os.FileInfo
 	if fi, err = m.file.Stat(); err != nil {
 		return
 	}
 
-	m.ctime = fi.Ctime_ns
+	m.ctime = fi.ModTime().UnixNano()
 	m.delta = delta_ns
 	runtime.SetFinalizer(m, func(m *MFile) {
 		m.file.Close()
@@ -124,12 +124,12 @@ func (m *MFile) File() (file *os.File, err error) {
 	}
 
 	if mustCheck { // check interval reached
-		var fi *os.FileInfo
+		var fi os.FileInfo
 		if fi, err = m.file.Stat(); err != nil {
 			return
 		}
 
-		if fi.Ctime_ns != m.ctime { // modification detected
+		if fi.ModTime().UnixNano() != m.ctime { // modification detected
 			if m.handler == nil {
 				return nil, fmt.Errorf("no handler set for modified file %q", m.file.Name())
 			}
@@ -137,7 +137,7 @@ func (m *MFile) File() (file *os.File, err error) {
 				return
 			}
 
-			m.ctime = fi.Ctime_ns
+			m.ctime = fi.ModTime().UnixNano()
 		}
 		m.t0 = now
 	}

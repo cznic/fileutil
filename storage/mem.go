@@ -17,7 +17,7 @@ import (
 
 type memaccessor struct {
 	f  *os.File
-	fi *os.FileInfo
+	fi *FileInfo
 	b  []byte
 }
 
@@ -33,10 +33,12 @@ func NewMem(f *os.File) (store Accessor, err error) {
 		return
 	}
 
-	if a.fi, err = a.f.Stat(); err != nil {
+	var fi os.FileInfo
+	if fi, err = a.f.Stat(); err != nil {
 		return
 	}
 
+	a.fi = NewFileInfo(fi)
 	store = a
 	return
 }
@@ -55,11 +57,13 @@ func OpenMem(f *os.File) (store Accessor, err error) {
 		return
 	}
 
-	if a.fi, err = a.f.Stat(); err != nil {
+	var fi os.FileInfo
+	if fi, err = a.f.Stat(); err != nil {
 		a.f.Close()
 		return
 	}
 
+	a.fi = NewFileInfo(fi)
 	store = a
 	return
 }
@@ -101,10 +105,10 @@ func (a *memaccessor) ReadAt(b []byte, off int64) (n int, err error) {
 	return
 }
 
-func (a *memaccessor) Stat() (fi *os.FileInfo, err error) {
-	fi = &os.FileInfo{}
-	*fi = *a.fi
-	fi.Size = int64(len(a.b))
+func (a *memaccessor) Stat() (fi os.FileInfo, err error) {
+	i := a.fi
+	i.FSize = int64(len(a.b))
+	fi = i
 	return
 }
 

@@ -9,19 +9,11 @@ package storage
 
 import (
 	"testing"
-	"time"
 )
 
-func TestDevTicks(t *testing.T) {
+func TestDevNothing(t *testing.T) {
 	if !*devFlag {
+		t.Log("not enabled")
 		return
 	}
-
-	ticker := time.NewTicker(1e9)
-	for i := 1; i < 5; i++ {
-		<-ticker.C
-		t.Logf("%.3f", float64(time.Nanoseconds())/1e9)
-		<-time.After(19e8)
-	}
-	ticker.Stop()
 }

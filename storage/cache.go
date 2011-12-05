@@ -89,7 +89,7 @@ type Cache struct {
 	cleaning int32
 	close    chan bool
 	f        Accessor
-	fi       *os.FileInfo
+	fi       *FileInfo
 	lock     sync.Mutex
 	lru      *list.List
 	m        map[int64]*cachepage
@@ -111,7 +111,7 @@ type Cache struct {
 // The LRU mechanism is used, so the cache tries to keep often accessed pages cached.
 //
 func NewCache(store Accessor, maxcache int64, advise func(int64, int, bool)) (c *Cache, err error) {
-	var fi *os.FileInfo
+	var fi os.FileInfo
 	if fi, err = store.Stat(); err != nil {
 		return
 	}
@@ -125,11 +125,11 @@ func NewCache(store Accessor, maxcache int64, advise func(int64, int, bool)) (c 
 		clean:    make(chan bool, 1),
 		close:    make(chan bool),
 		f:        store,
-		fi:       fi,
+		fi:       NewFileInfo(fi),
 		lru:      list.New(), // front == oldest used, back == last recently used
 		m:        make(map[int64]*cachepage),
 		maxpages: int(x),
-		size:     fi.Size,
+		size:     fi.Size(),
 		sync:     make(chan bool),
 		wlist:    list.New(),
 		write:    make(chan bool, 1),
@@ -194,12 +194,10 @@ func (c *Cache) ReadAt(b []byte, off int64) (n int, err error) {
 	return
 }
 
-func (c *Cache) Stat() (fi *os.FileInfo, err error) {
+func (c *Cache) Stat() (fi os.FileInfo, err error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	fi, err = c.f.Stat() //TODO cache it?
-	fi.Size = c.size
-	return
+	return c.fi, nil
 }
 
 func (c *Cache) Sync() (err error) {

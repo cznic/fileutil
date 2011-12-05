@@ -133,9 +133,9 @@ func Open(store storage.Accessor) (f *File, err error) {
 		panic(&EOpen{store.Name(), err})
 	}
 
-	fs := fi.Size
+	fs := fi.Size()
 	if fs&0xf != 0 {
-		panic(&ESize{store.Name(), fi.Size})
+		panic(&ESize{store.Name(), fi.Size()})
 	}
 
 	f = &File{f: store, atoms: fs >> 4}

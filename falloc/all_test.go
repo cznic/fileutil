@@ -161,7 +161,7 @@ func (f *File) audit() (usedblocks, totalblocks int64, err error) {
 	freeblocks := int64(0)
 
 	// linear scan
-	for fp < fi.Size {
+	for fp < fi.Size() {
 		totalblocks++
 		typ, size := f.getInfo(fp >> 4)
 		f.read(buf[:1], fp+size<<4-1)
@@ -2844,7 +2844,7 @@ func TestMix(t *testing.T) {
 	ha := make([]int64, n)
 	payload := 0
 
-	t0 := time.Nanoseconds()
+	t0 := time.Now()
 	// Alloc n block with upper half of content
 	for _ = range ha {
 		r := rng.Next()
@@ -2853,13 +2853,13 @@ func TestMix(t *testing.T) {
 		ha[r] = alloc(f, c)
 		payload += len(c)
 	}
-	dt := float64(time.Nanoseconds()-t0) / 1e9
+	dt := float64(time.Now().Sub(t0)) / 1e9
 	t.Logf("write time A %.3g", dt)
 
 	// verify
 	f = reaudit(t, f, *fnFlag)
 	t.Logf("size A %d for %d bytes (fill factor %3.1f%%)", f.atoms<<4, payload, 100*float64(payload)/float64(f.atoms<<4))
-	t0 = time.Nanoseconds()
+	t0 = time.Now()
 	for _ = range ha {
 		r := rng.Next()
 		c := content(b, int64(r))
@@ -2868,21 +2868,21 @@ func TestMix(t *testing.T) {
 			t.Fatal(10)
 		}
 	}
-	dt = float64(time.Nanoseconds()-t0) / 1e9
+	dt = float64(time.Now().Sub(t0)) / 1e9
 	t.Logf("read time A %.3g", dt)
 	// free half of the blocks
-	t0 = time.Nanoseconds()
+	t0 = time.Now()
 	for i := 0; i < n/2; i++ {
 		free(f, ha[i])
 		ha[i] = 0
 	}
-	dt = float64(time.Nanoseconds()-t0) / 1e9
+	dt = float64(time.Now().Sub(t0)) / 1e9
 	t.Logf("free time A %.3g", dt)
 
 	// verify
 	f = reaudit(t, f, *fnFlag)
 	t.Logf("size B %d (freeing half of the blocks)", f.atoms<<4)
-	t0 = time.Nanoseconds()
+	t0 = time.Now()
 	for _ = range ha {
 		r := rng.Next()
 		h := ha[r]
@@ -2896,11 +2896,11 @@ func TestMix(t *testing.T) {
 			t.Fatal(20)
 		}
 	}
-	dt = float64(time.Nanoseconds()-t0) / 1e9
+	dt = float64(time.Now().Sub(t0)) / 1e9
 	t.Logf("read time B %.3g", dt)
 
 	// reloc extend
-	t0 = time.Nanoseconds()
+	t0 = time.Now()
 	for _ = range ha {
 		r := rng.Next()
 		h := ha[r]
@@ -2914,14 +2914,14 @@ func TestMix(t *testing.T) {
 			t.Fatal(30)
 		}
 	}
-	dt = float64(time.Nanoseconds()-t0) / 1e9
+	dt = float64(time.Now().Sub(t0)) / 1e9
 	t.Logf("realoc time B %.3g", dt)
 
 	// verify
 	f = reaudit(t, f, *fnFlag)
 	t.Logf("size C %d for %d bytes (reallocated all used blocks to double size, fill factor %3.1f%%", f.atoms<<4, payload, 100*float64(payload)/float64(f.atoms<<4))
 
-	t0 = time.Nanoseconds()
+	t0 = time.Now()
 	for _ = range ha {
 		r := rng.Next()
 		h := ha[r]
@@ -2934,6 +2934,6 @@ func TestMix(t *testing.T) {
 			t.Fatal(40)
 		}
 	}
-	dt = float64(time.Nanoseconds()-t0) / 1e9
+	dt = float64(time.Now().Sub(t0)) / 1e9
 	t.Logf("read time C %.3g", dt)
 }
