@@ -21,12 +21,19 @@ type memaccessor struct {
 	b  []byte
 }
 
-// NewMem returns a new Accessor backed by an os.File.
-// The returned Accessor keeps all of the store content in memory.
-// The memory and file images are synced only by Sync and Close.
-// Recomended for small amounts of data only and content which may be lost on process kill/crash.
+// Implementation of Accessor.
+func (m *memaccessor) BeginUpdate() error { return nil }
+
+// Implementation of Accessor.
+func (f *memaccessor) EndUpdate() error { return nil }
+
+// NewMem returns a new Accessor backed by an os.File.  The returned Accessor
+// keeps all of the store content in memory.  The memory and file images are
+// synced only by Sync and Close.  Recomended for small amounts of data only
+// and content which may be lost on process kill/crash.  NewMem return the
+// Accessor or an error of any. 
 //
-// NewMem return the Accessor or an error of any.
+// NOTE: The returned Accessor implements BeginUpdate and EndUpdate as a no op.
 func NewMem(f *os.File) (store Accessor, err error) {
 	a := &memaccessor{f: f}
 	if err = f.Truncate(0); err != nil {
@@ -43,13 +50,13 @@ func NewMem(f *os.File) (store Accessor, err error) {
 	return
 }
 
-// OpenMem return a new Accessor backed by an os.File.
-// The store content is loaded from f.
-// The returned Accessor keeps all of the store content in memory.
-// The memory and file images are synced only Sync and Close.
-// Recomended for small amounts of data only and content which may be lost on process kill/crash.
+// OpenMem return a new Accessor backed by an os.File.  The store content is
+// loaded from f.  The returned Accessor keeps all of the store content in
+// memory.  The memory and file images are synced only Sync and Close.
+// Recomended for small amounts of data only and content which may be lost on
+// process kill/crash.  OpenMem return the Accessor or an error of any. 
 //
-// OpenMem return the Accessor or an error of any.
+// NOTE: The returned Accessor implements BeginUpdate and EndUpdate as a no op.
 func OpenMem(f *os.File) (store Accessor, err error) {
 	a := &memaccessor{f: f}
 	if a.b, err = ioutil.ReadAll(a.f); err != nil {
@@ -97,11 +104,7 @@ func (a *memaccessor) ReadAt(b []byte, off int64) (n int, err error) {
 		return -1, fmt.Errorf("ReadAt: illegal rq %#x @ offset %#x, len %#x", rq, fp, len(a.b))
 	}
 
-	n = copy(b, a.b[fp:])
-	if asserts && n != rq {
-		panic("internal error")
-	}
-
+	copy(b, a.b[fp:])
 	return
 }
 
@@ -153,10 +156,6 @@ func (a *memaccessor) WriteAt(b []byte, off int64) (n int, err error) {
 		}
 	}
 
-	n = copy(a.b[int(off):], b)
-	if asserts && n != rq {
-		panic("internal error")
-	}
-
+	copy(a.b[int(off):], b)
 	return
 }

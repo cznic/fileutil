@@ -105,6 +105,12 @@ type Cache struct {
 	Top      int   // "High water" pages
 }
 
+// Implementation of Accessor.
+func (c *Cache) BeginUpdate() error { return nil }
+
+// Implementation of Accessor.
+func (c *Cache) EndUpdate() error { return nil }
+
 // NewCache creates a caching Accessor from store with total of maxcache bytes.
 // NewCache returns the new Cache, implementing Accessor or an error if any.
 //

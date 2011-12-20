@@ -12,6 +12,7 @@ import (
 	"github.com/cznic/fileutil"
 	"github.com/cznic/fileutil/storage"
 	"github.com/cznic/mathutil"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -33,11 +34,55 @@ var (
 	fnFlag         = flag.String("f", "test.tmp", "test file name")
 	nFlag          = flag.Int("n", 1, "parameter for some of the dev tests")
 	probeFlag      = flag.Bool("probe", false, "report store probe statistics")
+	optGo          = flag.Int("go", 3, "GOMAXPROCS")
 )
 
 func init() {
-	runtime.GOMAXPROCS(3)
 	flag.Parse()
+	runtime.GOMAXPROCS(*optGo)
+}
+
+type balancedAcid struct {
+	storage.Accessor
+	nesting int
+}
+
+func newBalancedAcid(store storage.Accessor) storage.Accessor {
+	return &balancedAcid{store, 0}
+}
+
+func (b *balancedAcid) BeginUpdate() error {
+	if b.nesting < 0 {
+		return errors.New("BeginUpdate with nesting < 0")
+	}
+
+	b.nesting++
+	return nil
+}
+
+func (b *balancedAcid) EndUpdate() error {
+	if b.nesting <= 0 {
+		return errors.New("EndUpdate with nesting <= 0")
+	}
+
+	b.nesting--
+	return nil
+}
+
+func (b *balancedAcid) Close() error {
+	if b.nesting != 1 {
+		return fmt.Errorf("before Close(): nesting %d %p", b.nesting, b)
+	}
+
+	if err := b.Accessor.Close(); err != nil {
+		return err
+	}
+
+	if b.nesting != 1 {
+		return fmt.Errorf("after Close(): nesting %d", b.nesting)
+	}
+
+	return nil
 }
 
 func fopen(fn string) (f *File, err error) {
@@ -48,7 +93,7 @@ func fopen(fn string) (f *File, err error) {
 
 	var advise func(int64, int, bool)
 	if *fadviseFlag {
-		file := store.(*os.File)
+		file := store.(*storage.FileAccessor).File
 		if err = fileutil.Fadvise(file, 0, 0, fileutil.POSIX_FADV_RANDOM); err != nil {
 			return
 		}
@@ -73,7 +118,8 @@ func fopen(fn string) (f *File, err error) {
 			store = storage.NewProbe(store, prob)
 		}
 	}
-	return Open(store)
+	f, err = Open(newBalancedAcid(store))
+	return
 }
 
 func fcreate(fn string) (f *File, err error) {
@@ -84,7 +130,7 @@ func fcreate(fn string) (f *File, err error) {
 
 	var advise func(int64, int, bool)
 	if *fadviseFlag {
-		file := store.(*os.File)
+		file := store.(*storage.FileAccessor).File
 		if err = fileutil.Fadvise(file, 0, 0, fileutil.POSIX_FADV_RANDOM); err != nil {
 			return
 		}
@@ -109,7 +155,8 @@ func fcreate(fn string) (f *File, err error) {
 			store = storage.NewProbe(store, prob)
 		}
 	}
-	return New(store)
+	f, err = New(newBalancedAcid(store))
+	return
 }
 
 func probed(t *testing.T, f *File) {
@@ -344,7 +391,6 @@ func reaudit(t *testing.T, f *File, fn string) (of *File) {
 	}
 
 	if _, _, err := of.audit(); err != nil {
-		println("reaudit err 286", err)
 		t.Fatal(err)
 	}
 
@@ -360,36 +406,37 @@ func TestCreate(t *testing.T) {
 	defer func() {
 		err := os.Remove(*fnFlag)
 		if err != nil {
-			t.Fatal(10010, err)
+			t.Fatal(err)
 		}
 	}()
 
 	f.Accessor().Sync()
 	probed(t, f)
 	if err = f.Close(); err != nil {
-		t.Fatal(5, err)
+		t.Log(f.f.(*balancedAcid).nesting)
+		t.Fatal(err)
 	}
 
 	b, err := ioutil.ReadFile(*fnFlag)
 	if err != nil {
-		t.Fatal(10, err)
+		t.Fatal(err)
 	}
 
 	x := b[:16]
 	if !bytes.Equal(x, hdr) {
-		t.Fatalf("20\n% x\n% x", x, hdr)
+		t.Fatalf("\n% x\n% x", x, hdr)
 	}
 
 	x = b[16:32]
 	if !bytes.Equal(x, empty) {
-		t.Fatalf("30\n% x\n% x", x, hdr)
+		t.Fatalf("\n% x\n% x", x, hdr)
 	}
 }
 
 func TestOpen(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(10, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
@@ -397,25 +444,25 @@ func TestOpen(t *testing.T) {
 		ec := f.Close()
 		er := os.Remove(*fnFlag)
 		if ec != nil {
-			t.Fatal(10000, ec)
+			t.Fatal(ec)
 		}
 
 		if er != nil {
-			t.Fatal(10010, er)
+			t.Fatal(er)
 		}
 	}()
 
 	if err := f.Close(); err != nil {
-		t.Fatal(20, err)
+		t.Fatal(err)
 	}
 
 	if f, err = fopen(*fnFlag); err != nil {
-		t.Fatal(30, err)
+		t.Fatal(err)
 	}
 
 	for i, p := range f.freetab {
 		if p != 0 {
-			t.Fatal(40, i+1, p)
+			t.Fatal(i+1, p)
 		}
 	}
 }
@@ -448,11 +495,11 @@ func testContentEncodingDecoding(t *testing.T, min, max int) {
 		ec := f.Close()
 		er := os.Remove(*fnFlag)
 		if ec != nil {
-			t.Fatal(10000, ec)
+			t.Fatal(ec)
 		}
 
 		if er != nil {
-			t.Fatal(10010, er)
+			t.Fatal(er)
 		}
 	}()
 
@@ -498,13 +545,13 @@ func testContentEncodingDecoding(t *testing.T, min, max int) {
 	f.Accessor().Sync()
 	probed(t, f)
 	if err := f.Close(); err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	f = nil
 	runtime.GC()
 	if f, err = fopen(*fnFlag); err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	r.Seek(0)
@@ -518,7 +565,7 @@ func testContentEncodingDecoding(t *testing.T, min, max int) {
 		}
 		got, _ := f.readUsed(h)
 		if !bytes.Equal(src, got) {
-			t.Fatalf("10 cl %d atom %#x\nexp % x\ngot % x", cl, h, src, got)
+			t.Fatalf("cl %d atom %#x\nexp % x\ngot % x", cl, h, src, got)
 		}
 		if cl == 0 {
 			continue
@@ -532,7 +579,7 @@ func testContentEncodingDecoding(t *testing.T, min, max int) {
 		ai++
 		got, _ = f.readUsed(h)
 		if !bytes.Equal(src, got) {
-			t.Fatalf("20 cl %d atom %#x\nexp % x\ngot % x", cl, h, src, got)
+			t.Fatalf("cl %d atom %#x\nexp % x\ngot % x", cl, h, src, got)
 		}
 
 		for i := range src {
@@ -543,7 +590,7 @@ func testContentEncodingDecoding(t *testing.T, min, max int) {
 		ai++
 		got, _ = f.readUsed(h)
 		if !bytes.Equal(src, got) {
-			t.Fatalf("30 cl %d atom %#x\nexp % x\ngot % x", cl, h, src, got)
+			t.Fatalf("cl %d atom %#x\nexp % x\ngot % x", cl, h, src, got)
 		}
 
 		for i := range src {
@@ -554,21 +601,21 @@ func testContentEncodingDecoding(t *testing.T, min, max int) {
 		ai++
 		got, _ = f.readUsed(h)
 		if !bytes.Equal(src, got) {
-			t.Fatalf("40 cl %d atom %#x\nexp % x\ngot % x", cl, h, src, got)
+			t.Fatalf("cl %d atom %#x\nexp % x\ngot % x", cl, h, src, got)
 		}
 	}
 
 	auditblocks, _, err := f.audit()
 	if err != nil {
-		t.Fatal(45, err)
+		t.Fatal(err)
 	}
 
 	if auditblocks != blocks {
-		t.Fatal(50, auditblocks, blocks)
+		t.Fatal(auditblocks, blocks)
 	}
 
 	if f = reaudit(t, f, *fnFlag); err != nil {
-		t.Fatal(60, err)
+		t.Fatal(err)
 	}
 }
 
@@ -607,11 +654,11 @@ func testFreeTail(t *testing.T, b []byte) {
 		ec := f.Close()
 		er := os.Remove(*fnFlag)
 		if ec != nil {
-			t.Fatal(10000, ec)
+			t.Fatal(ec)
 		}
 
 		if er != nil {
-			t.Fatal(10010, er)
+			t.Fatal(er)
 		}
 	}()
 
@@ -622,27 +669,27 @@ func testFreeTail(t *testing.T, b []byte) {
 	}
 
 	if used0 != total0 {
-		t.Fatal(10, used0, total0)
+		t.Fatal(used0, total0)
 	}
 
 	handle := alloc(f, b)
 	free(f, handle)
 	if fs1 := f.atoms; fs1 != fs0 {
-		t.Fatal(20, fs1, fs0)
+		t.Fatal(fs1, fs0)
 	}
 
 	if rep := f.reportFree(); len(rep) != 0 {
-		t.Fatal(30, rep)
+		t.Fatal(rep)
 	}
 
 	if err := f.Close(); err != nil {
-		t.Fatal(35, err)
+		t.Fatal(err)
 	}
 
 	f = nil
 	runtime.GC()
 	if f, err = fopen(*fnFlag); err != nil {
-		t.Fatal(35, err)
+		t.Fatal(err)
 	}
 
 	used, total, err := f.audit()
@@ -651,11 +698,11 @@ func testFreeTail(t *testing.T, b []byte) {
 	}
 
 	if used != used0 {
-		t.Fatal(40, used, used0)
+		t.Fatal(used, used0)
 	}
 
 	if total != total0 {
-		t.Fatal(50, total, total0)
+		t.Fatal(total, total0)
 	}
 }
 
@@ -692,11 +739,11 @@ func testFreeTail2(t *testing.T, b []byte) {
 		ec := f.Close()
 		er := os.Remove(*fnFlag)
 		if ec != nil {
-			t.Fatal(10000, ec)
+			t.Fatal(ec)
 		}
 
 		if er != nil {
-			t.Fatal(10010, er)
+			t.Fatal(er)
 		}
 	}()
 
@@ -707,7 +754,7 @@ func testFreeTail2(t *testing.T, b []byte) {
 	}
 
 	if used0 != total0 {
-		t.Fatal(10, used0, total0)
+		t.Fatal(used0, total0)
 	}
 
 	handle := alloc(f, b)
@@ -715,21 +762,21 @@ func testFreeTail2(t *testing.T, b []byte) {
 	free(f, handle)
 	free(f, handle2)
 	if fs1 := f.atoms; fs1 != fs0 {
-		t.Fatal(20, fs1, fs0)
+		t.Fatal(fs1, fs0)
 	}
 
 	if rep := f.reportFree(); len(rep) != 0 {
-		t.Fatal(30, rep)
+		t.Fatal(rep)
 	}
 
 	if err := f.Close(); err != nil {
-		t.Fatal(35, err)
+		t.Fatal(err)
 	}
 
 	f = nil
 	runtime.GC()
 	if f, err = fopen(*fnFlag); err != nil {
-		t.Fatal(35, err)
+		t.Fatal(err)
 	}
 
 	used, total, err := f.audit()
@@ -738,11 +785,11 @@ func testFreeTail2(t *testing.T, b []byte) {
 	}
 
 	if used != used0 {
-		t.Fatal(40, used, used0)
+		t.Fatal(used, used0)
 	}
 
 	if total != total0 {
-		t.Fatal(50, total, total0)
+		t.Fatal(total, total0)
 	}
 }
 
@@ -779,11 +826,11 @@ func testFreeIsolated(t *testing.T, b []byte) {
 		ec := f.Close()
 		er := os.Remove(*fnFlag)
 		if ec != nil {
-			t.Fatal(10000, ec)
+			t.Fatal(ec)
 		}
 
 		if er != nil {
-			t.Fatal(10010, er)
+			t.Fatal(er)
 		}
 	}()
 
@@ -799,21 +846,21 @@ func testFreeIsolated(t *testing.T, b []byte) {
 	}
 
 	if used0 != total0 {
-		t.Fatal(10, used0, total0)
+		t.Fatal(used0, total0)
 	}
 
 	free(f, handle)
 	if fs1 := f.atoms; fs1 != fs0 {
-		t.Fatal(20, fs1, fs0)
+		t.Fatal(fs1, fs0)
 	}
 
 	rep := f.reportFree()
 	if len(rep) != 1 {
-		t.Fatal(30, rep)
+		t.Fatal(rep)
 	}
 
 	if x := rep[0]; x.size != rqAtoms || x.head != handle {
-		t.Fatal(40, x)
+		t.Fatal(x)
 	}
 
 	used, total, err := f.audit()
@@ -822,28 +869,28 @@ func testFreeIsolated(t *testing.T, b []byte) {
 	}
 
 	if n, free := f.getSize(left); n != 1 || free {
-		t.Fatal(50, n, free)
+		t.Fatal(n, free)
 	}
 
 	if n, free := f.getSize(right); n != 1 || free {
-		t.Fatal(60, n, free)
+		t.Fatal(n, free)
 	}
 
 	if used != used0-1 {
-		t.Fatal(70, used, used0)
+		t.Fatal(used, used0)
 	}
 
 	if total != total0 {
-		t.Fatal(80, total, total0)
+		t.Fatal(total, total0)
 	}
 
 	if free := total - used; free != 1 {
-		t.Fatal(90, free)
+		t.Fatal(free)
 	}
 
 	// verify persisted file correct
 	if err := f.Close(); err != nil {
-		t.Fatal(95, err)
+		t.Fatal(err)
 	}
 
 	f = nil
@@ -853,16 +900,16 @@ func testFreeIsolated(t *testing.T, b []byte) {
 	}
 
 	if fs1 := f.atoms; fs1 != fs0 {
-		t.Fatal(120, fs1, fs0)
+		t.Fatal(fs1, fs0)
 	}
 
 	rep = f.reportFree()
 	if len(rep) != 1 {
-		t.Fatal(130, rep)
+		t.Fatal(rep)
 	}
 
 	if x := rep[0]; x.size != rqAtoms || x.head != handle {
-		t.Fatal(140, x)
+		t.Fatal(x)
 	}
 
 	used, total, err = f.audit()
@@ -871,23 +918,23 @@ func testFreeIsolated(t *testing.T, b []byte) {
 	}
 
 	if n, free := f.getSize(left); n != 1 || free {
-		t.Fatal(150, n, free)
+		t.Fatal(n, free)
 	}
 
 	if n, free := f.getSize(right); n != 1 || free {
-		t.Fatal(160, n, free)
+		t.Fatal(n, free)
 	}
 
 	if used != used0-1 {
-		t.Fatal(170, used, used0)
+		t.Fatal(used, used0)
 	}
 
 	if total != total0 {
-		t.Fatal(180, total, total0)
+		t.Fatal(total, total0)
 	}
 
 	if free := total - used; free != 1 {
-		t.Fatal(190, free)
+		t.Fatal(free)
 	}
 
 }
@@ -911,13 +958,13 @@ func testFreeBlockList(t *testing.T, a, b int) {
 	t.Log(a, b)
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(10, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(15, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -928,7 +975,7 @@ func testFreeBlockList(t *testing.T, a, b int) {
 
 	used0, total0, err := f.audit()
 	if err != nil {
-		t.Fatal(20, err)
+		t.Fatal(err)
 	}
 
 	alloc(f, nil)
@@ -938,22 +985,22 @@ func testFreeBlockList(t *testing.T, a, b int) {
 	alloc(f, nil)
 
 	if err := f.Close(); err != nil {
-		t.Fatal(25, err)
+		t.Fatal(err)
 	}
 
 	f = nil
 	runtime.GC()
 	if f, err = fopen(*fnFlag); err != nil {
-		t.Fatal(30, err)
+		t.Fatal(err)
 	}
 
 	used, total, err := f.audit()
 	if err != nil {
-		t.Fatal(40, err)
+		t.Fatal(err)
 	}
 
 	if used-used0 != 5 || total-total0 != 5 || used != total {
-		t.Fatal(50, used0, total0, used, total)
+		t.Fatal(used0, total0, used, total)
 	}
 
 	free(f, h[a])
@@ -961,30 +1008,30 @@ func testFreeBlockList(t *testing.T, a, b int) {
 
 	used, total, err = f.audit()
 	if err != nil {
-		t.Fatal(60, err)
+		t.Fatal(err)
 	}
 
 	if used-used0 != 3 || total-total0 != 5 || total-used != 2 {
-		t.Fatal(70, used0, total0, used, total)
+		t.Fatal(used0, total0, used, total)
 	}
 
 	if err := f.Close(); err != nil {
-		t.Fatal(75, err)
+		t.Fatal(err)
 	}
 
 	f = nil
 	runtime.GC()
 	if f, err = fopen(*fnFlag); err != nil {
-		t.Fatal(80, err)
+		t.Fatal(err)
 	}
 
 	used, total, err = f.audit()
 	if err != nil {
-		t.Fatal(90, err)
+		t.Fatal(err)
 	}
 
 	if used-used0 != 3 || total-total0 != 5 || total-used != 2 {
-		t.Fatal(100, used0, total0, used, total)
+		t.Fatal(used0, total0, used, total)
 	}
 }
 
@@ -998,13 +1045,13 @@ func testFreeBlockList2(t *testing.T, a, b, c int) {
 
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -1027,7 +1074,7 @@ func testFreeBlockList2(t *testing.T, a, b, c int) {
 	alloc(f, nil)
 
 	if err := f.Close(); err != nil {
-		t.Fatal(7, err)
+		t.Fatal(err)
 	}
 
 	f = nil
@@ -1059,7 +1106,7 @@ func testFreeBlockList2(t *testing.T, a, b, c int) {
 	}
 
 	if err := f.Close(); err != nil {
-		t.Fatal(8, err)
+		t.Fatal(err)
 	}
 
 	f = nil
@@ -1109,7 +1156,7 @@ func content(b []byte, h int64) (c []byte) {
 func testFreeBlockList3(t *testing.T, n, mod int) {
 	rng, err := mathutil.NewFC32(0, n-1, true)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	f, err := fcreate(*fnFlag)
@@ -1120,7 +1167,7 @@ func testFreeBlockList3(t *testing.T, n, mod int) {
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -1136,7 +1183,7 @@ func testFreeBlockList3(t *testing.T, n, mod int) {
 		ha[i] = h
 		c := content(b, h)
 		if alloc(f, c) != h {
-			t.Fatal(10, h)
+			t.Fatal(h)
 		}
 	}
 	f = reaudit(t, f, *fnFlag)
@@ -1155,7 +1202,7 @@ func testFreeBlockList3(t *testing.T, n, mod int) {
 			exp := content(b, h)
 			got, _ := f.readUsed(h)
 			if !bytes.Equal(exp, got) {
-				t.Fatal(20, len(got), len(exp))
+				t.Fatal(len(got), len(exp))
 			}
 		}
 	}
@@ -1171,13 +1218,13 @@ func TestFreeBlockList3(t *testing.T) {
 func TestRealloc1(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -1199,25 +1246,25 @@ func TestRealloc1(t *testing.T) {
 
 	exp := c[:15]
 	if handle := realloc(f, h10, exp, false); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(30, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(130, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	used, total, err := f.audit()
@@ -1226,20 +1273,20 @@ func TestRealloc1(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != 0 || diftotal != 0 || free != 0 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRealloc1Keep(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -1261,25 +1308,25 @@ func TestRealloc1Keep(t *testing.T) {
 
 	exp := c[:15]
 	if handle := realloc(f, h10, exp, true); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(30, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(130, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	used, total, err := f.audit()
@@ -1288,20 +1335,20 @@ func TestRealloc1Keep(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != 0 || diftotal != 0 || free != 0 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRealloc2(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -1323,25 +1370,25 @@ func TestRealloc2(t *testing.T) {
 
 	exp := c[:15]
 	if handle := realloc(f, h10, exp, false); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(30, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(130, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	used, total, err := f.audit()
@@ -1350,20 +1397,20 @@ func TestRealloc2(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != 0 || diftotal != 1 || free != 1 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRealloc2Keep(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -1385,25 +1432,25 @@ func TestRealloc2Keep(t *testing.T) {
 
 	exp := c[:15]
 	if handle := realloc(f, h10, exp, true); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(30, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(130, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	used, total, err := f.audit()
@@ -1412,20 +1459,20 @@ func TestRealloc2Keep(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != 0 || diftotal != 1 || free != 1 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRealloc3(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -1448,25 +1495,25 @@ func TestRealloc3(t *testing.T) {
 	exp := c[:31]
 	var handle int64
 	if handle = realloc(f, h10, exp, false); handle == h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(handle); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(30, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(handle); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(130, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	used, total, err := f.audit()
@@ -1475,20 +1522,20 @@ func TestRealloc3(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != 0 || diftotal != 1 || free != 1 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRealloc3Keep(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -1511,25 +1558,25 @@ func TestRealloc3Keep(t *testing.T) {
 	exp := c[:31]
 	var handle int64
 	if handle = realloc(f, h10, exp, true); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(handle); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(30, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(handle); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(130, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	used, total, err := f.audit()
@@ -1538,20 +1585,20 @@ func TestRealloc3Keep(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != 1 || diftotal != 1 || free != 0 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRealloc4Keep(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -1574,25 +1621,25 @@ func TestRealloc4Keep(t *testing.T) {
 	exp := c[:47]
 	var handle int64
 	if handle = realloc(f, h10, exp, true); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(handle); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(30, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(handle); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(130, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	used, total, err := f.audit()
@@ -1601,20 +1648,20 @@ func TestRealloc4Keep(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != 1 || diftotal != 2 || free != 1 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRealloc5(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -1639,25 +1686,25 @@ func TestRealloc5(t *testing.T) {
 	exp := c[:31]
 	var handle int64
 	if handle = realloc(f, h10, exp, false); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(handle); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(30, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(handle); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(130, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	used, total, err := f.audit()
@@ -1666,20 +1713,20 @@ func TestRealloc5(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != -1 || diftotal != -1 || free != 0 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRealloc5Keep(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -1704,25 +1751,25 @@ func TestRealloc5Keep(t *testing.T) {
 	exp := c[:31]
 	var handle int64
 	if handle = realloc(f, h10, exp, true); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(handle); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(30, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(handle); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(130, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	used, total, err := f.audit()
@@ -1731,20 +1778,20 @@ func TestRealloc5Keep(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != -1 || diftotal != -1 || free != 0 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRealloc6(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -1769,25 +1816,25 @@ func TestRealloc6(t *testing.T) {
 	exp := c[:31]
 	var handle int64
 	if handle = realloc(f, h10, exp, false); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(handle); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(30, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(handle); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(130, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	used, total, err := f.audit()
@@ -1796,20 +1843,20 @@ func TestRealloc6(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != -1 || diftotal != 0 || free != 1 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRealloc6Keep(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -1834,25 +1881,25 @@ func TestRealloc6Keep(t *testing.T) {
 	exp := c[:31]
 	var handle int64
 	if handle = realloc(f, h10, exp, true); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(handle); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(30, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(handle); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(130, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	used, total, err := f.audit()
@@ -1861,20 +1908,20 @@ func TestRealloc6Keep(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != -1 || diftotal != 0 || free != 1 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRelocRealloc1(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -1889,7 +1936,7 @@ func TestRelocRealloc1(t *testing.T) {
 	h20 := alloc(f, nil)
 	var handle int64
 	if handle = realloc(f, h10, b[:31], true); handle != h10 {
-		t.Fatal(5, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	used0, total0, err := f.audit() // c+3, c+3
@@ -1900,25 +1947,25 @@ func TestRelocRealloc1(t *testing.T) {
 	c := content(b, 10)
 	exp := c[:15]
 	if handle = realloc(f, h10, exp, false); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(30, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(130, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	used, total, err := f.audit() // c+2, c+2
@@ -1927,20 +1974,20 @@ func TestRelocRealloc1(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != -1 || diftotal != -1 || free != 0 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRelocRealloc1Keep(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -1955,7 +2002,7 @@ func TestRelocRealloc1Keep(t *testing.T) {
 	h20 := alloc(f, nil)
 	var handle int64
 	if handle = realloc(f, h10, b[:31], true); handle != h10 {
-		t.Fatal(5, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	used0, total0, err := f.audit() // c+3, c+3
@@ -1966,25 +2013,25 @@ func TestRelocRealloc1Keep(t *testing.T) {
 	c := content(b, 10)
 	exp := c[:15]
 	if handle = realloc(f, h10, exp, true); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(30, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	if got, _ := f.readUsed(h20); len(got) != 0 {
-		t.Fatal(130, len(got), 0)
+		t.Fatal(len(got), 0)
 	}
 
 	used, total, err := f.audit() // c+2, c+2
@@ -1993,20 +2040,20 @@ func TestRelocRealloc1Keep(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != -1 || diftotal != -1 || free != 0 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRelocRealloc2(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -2021,7 +2068,7 @@ func TestRelocRealloc2(t *testing.T) {
 	h20 := alloc(f, nil)
 	var handle int64
 	if handle = realloc(f, h10, b[:31], true); handle != h10 {
-		t.Fatal(5, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	free(f, h20)
@@ -2034,17 +2081,17 @@ func TestRelocRealloc2(t *testing.T) {
 	c := content(b, 10)
 	exp := c[:31]
 	if handle = realloc(f, h10, exp, false); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	used, total, err := f.audit() // c+1, c+1
@@ -2053,20 +2100,20 @@ func TestRelocRealloc2(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != -1 || diftotal != -2 || free != 0 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRelocRealloc2Keep(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -2081,7 +2128,7 @@ func TestRelocRealloc2Keep(t *testing.T) {
 	h20 := alloc(f, nil)
 	var handle int64
 	if handle = realloc(f, h10, b[:31], true); handle != h10 {
-		t.Fatal(5, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	free(f, h20)
@@ -2094,17 +2141,17 @@ func TestRelocRealloc2Keep(t *testing.T) {
 	c := content(b, 10)
 	exp := c[:31]
 	if handle = realloc(f, h10, exp, true); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	used, total, err := f.audit() // c+1, c+1
@@ -2113,20 +2160,20 @@ func TestRelocRealloc2Keep(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != -1 || diftotal != -2 || free != 0 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRelocRealloc3(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -2141,7 +2188,7 @@ func TestRelocRealloc3(t *testing.T) {
 	h20 := alloc(f, b[:31])
 	var handle int64
 	if handle = realloc(f, h10, b[:31], true); handle != h10 {
-		t.Fatal(5, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	free(f, h20)
@@ -2154,17 +2201,17 @@ func TestRelocRealloc3(t *testing.T) {
 	c := content(b, 10)
 	exp := c[:31]
 	if handle = realloc(f, h10, exp, false); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	used, total, err := f.audit() // c+1, c+1
@@ -2173,20 +2220,20 @@ func TestRelocRealloc3(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != -1 || diftotal != -2 || free != 0 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRelocRealloc3Keep(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -2201,7 +2248,7 @@ func TestRelocRealloc3Keep(t *testing.T) {
 	h20 := alloc(f, b[:31])
 	var handle int64
 	if handle = realloc(f, h10, b[:31], true); handle != h10 {
-		t.Fatal(5, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	free(f, h20)
@@ -2214,17 +2261,17 @@ func TestRelocRealloc3Keep(t *testing.T) {
 	c := content(b, 10)
 	exp := c[:31]
 	if handle = realloc(f, h10, exp, true); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	used, total, err := f.audit() // c+1, c+1
@@ -2233,20 +2280,20 @@ func TestRelocRealloc3Keep(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != -1 || diftotal != -2 || free != 0 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRelocRealloc4(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -2261,13 +2308,13 @@ func TestRelocRealloc4(t *testing.T) {
 	_ = alloc(f, nil)
 	var handle int64
 	if handle = realloc(f, h10, b[:47], true); handle != h10 {
-		t.Fatal(5, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	_ = alloc(f, nil)
 
 	if handle = realloc(f, h10, b[:31], true); handle != h10 {
-		t.Fatal(7, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	used0, total0, err := f.audit() // c+4, c+5
@@ -2278,17 +2325,17 @@ func TestRelocRealloc4(t *testing.T) {
 	c := content(b, 10)
 	exp := c[:47]
 	if handle = realloc(f, h10, exp, false); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	used, total, err := f.audit() // c+4, c+4
@@ -2297,20 +2344,20 @@ func TestRelocRealloc4(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != 0 || diftotal != -1 || free != 0 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRelocRealloc4Keep(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -2325,13 +2372,13 @@ func TestRelocRealloc4Keep(t *testing.T) {
 	_ = alloc(f, nil)
 	var handle int64
 	if handle = realloc(f, h10, b[:47], true); handle != h10 {
-		t.Fatal(5, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	_ = alloc(f, nil)
 
 	if handle = realloc(f, h10, b[:31], true); handle != h10 {
-		t.Fatal(7, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	used0, total0, err := f.audit() // c+4, c+5
@@ -2342,17 +2389,17 @@ func TestRelocRealloc4Keep(t *testing.T) {
 	c := content(b, 10)
 	exp := c[:47]
 	if handle = realloc(f, h10, exp, true); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	used, total, err := f.audit() // c+4, c+4
@@ -2361,20 +2408,20 @@ func TestRelocRealloc4Keep(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != 0 || diftotal != -1 || free != 0 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRelocRealloc5(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -2389,7 +2436,7 @@ func TestRelocRealloc5(t *testing.T) {
 	_ = alloc(f, nil)
 	var handle int64
 	if handle = realloc(f, h10, b[:31], true); handle != h10 {
-		t.Fatal(5, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	_ = alloc(f, nil)
@@ -2402,17 +2449,17 @@ func TestRelocRealloc5(t *testing.T) {
 	c := content(b, 10)
 	exp := c[:47]
 	if handle = realloc(f, h10, exp, false); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	used, total, err := f.audit() // c+4, c+5
@@ -2421,20 +2468,20 @@ func TestRelocRealloc5(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != 0 || diftotal != 1 || free != 1 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRelocRealloc5Keep(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -2449,7 +2496,7 @@ func TestRelocRealloc5Keep(t *testing.T) {
 	_ = alloc(f, nil)
 	var handle int64
 	if handle = realloc(f, h10, b[:31], true); handle != h10 {
-		t.Fatal(5, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	_ = alloc(f, nil)
@@ -2462,17 +2509,17 @@ func TestRelocRealloc5Keep(t *testing.T) {
 	c := content(b, 10)
 	exp := c[:47]
 	if handle = realloc(f, h10, exp, true); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	used, total, err := f.audit() // c+4, c+5
@@ -2481,20 +2528,20 @@ func TestRelocRealloc5Keep(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != 0 || diftotal != 1 || free != 1 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRelocRealloc6(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -2518,17 +2565,17 @@ func TestRelocRealloc6(t *testing.T) {
 	c := content(b, 10)
 	exp := c[:15]
 	if handle := realloc(f, h10, exp, false); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	used, total, err := f.audit() // c+2, c+3
@@ -2537,20 +2584,20 @@ func TestRelocRealloc6(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != 0 || diftotal != 0 || free != 1 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestRelocRealloc6Keep(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -2574,17 +2621,17 @@ func TestRelocRealloc6Keep(t *testing.T) {
 	c := content(b, 10)
 	exp := c[:15]
 	if handle := realloc(f, h10, exp, true); handle != h10 {
-		t.Fatal(10, handle, h10)
+		t.Fatal(handle, h10)
 	}
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(20, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, exp) {
-		t.Fatal(120, len(got), len(exp))
+		t.Fatal(len(got), len(exp))
 	}
 
 	used, total, err := f.audit() // c+2, c+3
@@ -2593,20 +2640,20 @@ func TestRelocRealloc6Keep(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != 0 || diftotal != 0 || free != 1 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestFreespaceReuse(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -2637,29 +2684,29 @@ func TestFreespaceReuse(t *testing.T) {
 	h20 := alloc(f, c20)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, c10) {
-		t.Fatal(10)
+		t.Fatal()
 	}
 
 	if got, _ := f.readUsed(h20); !bytes.Equal(got, c20) {
-		t.Fatal(20)
+		t.Fatal()
 	}
 
 	if got, _ := f.readUsed(h50); !bytes.Equal(got, c50) {
-		t.Fatal(30)
+		t.Fatal()
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, c10) {
-		t.Fatal(110)
+		t.Fatal()
 	}
 
 	if got, _ := f.readUsed(h20); !bytes.Equal(got, c20) {
-		t.Fatal(120)
+		t.Fatal()
 	}
 
 	if got, _ := f.readUsed(h50); !bytes.Equal(got, c50) {
-		t.Fatal(130)
+		t.Fatal()
 	}
 
 	used, total, err := f.audit() // c+3, c+3
@@ -2668,20 +2715,20 @@ func TestFreespaceReuse(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != 1 || diftotal != 0 || free != 0 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
 func TestFreespaceReuse2(t *testing.T) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -2712,29 +2759,29 @@ func TestFreespaceReuse2(t *testing.T) {
 	h20 := alloc(f, c20)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, c10) {
-		t.Fatal(10)
+		t.Fatal()
 	}
 
 	if got, _ := f.readUsed(h20); !bytes.Equal(got, c20) {
-		t.Fatal(20)
+		t.Fatal()
 	}
 
 	if got, _ := f.readUsed(h50); !bytes.Equal(got, c50) {
-		t.Fatal(30)
+		t.Fatal()
 	}
 
 	f = reaudit(t, f, *fnFlag)
 
 	if got, _ := f.readUsed(h10); !bytes.Equal(got, c10) {
-		t.Fatal(110)
+		t.Fatal()
 	}
 
 	if got, _ := f.readUsed(h20); !bytes.Equal(got, c20) {
-		t.Fatal(120)
+		t.Fatal()
 	}
 
 	if got, _ := f.readUsed(h50); !bytes.Equal(got, c50) {
-		t.Fatal(130)
+		t.Fatal()
 	}
 
 	used, total, err := f.audit() // c+3, c+4
@@ -2743,7 +2790,7 @@ func TestFreespaceReuse2(t *testing.T) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != 1 || diftotal != 1 || free != 1 {
-		t.Fatal(140, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
@@ -2752,13 +2799,13 @@ func testBug1(t *testing.T, swap bool) {
 	// NOT of size 3856 but at least 3856.
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -2793,7 +2840,7 @@ func testBug1(t *testing.T, swap bool) {
 	}
 
 	if difused, diftotal, free := used-used0, total-total0, total-used; difused != -1 || diftotal != 0 || free != 1 {
-		t.Fatal(10, difused, diftotal, free)
+		t.Fatal(difused, diftotal, free)
 	}
 }
 
@@ -2820,13 +2867,13 @@ func TestMix(t *testing.T) {
 	t.Log(n)
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(5, err)
+		t.Fatal(err)
 	}
 
 	defer func() {
 		if f != nil {
 			if err := f.Close(); err != nil {
-				t.Fatal(6, err)
+				t.Fatal(err)
 			}
 		}
 
@@ -2865,7 +2912,7 @@ func TestMix(t *testing.T) {
 		c := content(b, int64(r))
 		c = c[len(c)/2:]
 		if got, _ := f.readUsed(ha[r]); !bytes.Equal(got, c) {
-			t.Fatal(10)
+			t.Fatal()
 		}
 	}
 	dt = float64(time.Now().Sub(t0)) / 1e9
@@ -2893,7 +2940,7 @@ func TestMix(t *testing.T) {
 		c := content(b, int64(r))
 		c = c[len(c)/2:]
 		if got, _ := f.readUsed(h); !bytes.Equal(got, c) {
-			t.Fatal(20)
+			t.Fatal()
 		}
 	}
 	dt = float64(time.Now().Sub(t0)) / 1e9
@@ -2911,7 +2958,7 @@ func TestMix(t *testing.T) {
 		c := content(b, int64(r))
 		//f = reaudit(t, f, *fnFlag)
 		if h2 := realloc(f, h, c, true); h2 != h {
-			t.Fatal(30)
+			t.Fatal()
 		}
 	}
 	dt = float64(time.Now().Sub(t0)) / 1e9
@@ -2931,7 +2978,7 @@ func TestMix(t *testing.T) {
 
 		c := content(b, int64(r))
 		if got, _ := f.readUsed(ha[r]); !bytes.Equal(got, c) {
-			t.Fatal(40)
+			t.Fatal()
 		}
 	}
 	dt = float64(time.Now().Sub(t0)) / 1e9

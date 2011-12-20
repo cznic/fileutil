@@ -72,6 +72,7 @@ func qmapmem(nFlag int) uint64 {
 
 func TestDev0(t *testing.T) {
 	if !*devFlag {
+		t.Log("Not enabled")
 		return
 	}
 
@@ -114,11 +115,11 @@ func testBenchAlloc(t *testing.T, n, block int) (dt int64) {
 		ec := f.Close()
 		er := os.Remove(*fnFlag)
 		if ec != nil {
-			t.Fatal(10000, ec)
+			t.Fatal(ec)
 		}
 
 		if er != nil {
-			t.Fatal(10010, er)
+			t.Fatal(er)
 		}
 	}()
 
@@ -147,6 +148,7 @@ func testBenchAlloc(t *testing.T, n, block int) (dt int64) {
 
 func TestDevBenchAlloc(t *testing.T) {
 	if !*devFlag {
+		t.Log("Not enabled")
 		return
 	}
 
@@ -169,7 +171,7 @@ func TestDevBenchAlloc(t *testing.T) {
 func testBenchRead(t *testing.T, n, block int) (dt int64) {
 	f, err := fcreate(*fnFlag)
 	if err != nil {
-		t.Fatal(10, err)
+		t.Fatal(err)
 	}
 
 	perc := 1
@@ -187,7 +189,7 @@ func testBenchRead(t *testing.T, n, block int) (dt int64) {
 			print("w ", (1000*uint64(i))/uint64(n), " eta ", int(rt/60), ":", int(rt)%60, "              \r")
 		}
 		if h[i], err = f.Alloc(b); err != nil {
-			t.Fatal(40, err)
+			t.Fatal(err)
 		}
 	}
 
@@ -204,7 +206,7 @@ func testBenchRead(t *testing.T, n, block int) (dt int64) {
 			print("r ", (1000*uint64(i))/uint64(n), " eta ", int(rt/60), ":", int(rt)%60, "              \r")
 		}
 		if _, err := f.Read(h[i]); err != nil {
-			t.Fatal(70, err)
+			t.Fatal(err)
 		}
 	}
 	dt = time.Now().UnixNano() - dt
@@ -214,11 +216,11 @@ func testBenchRead(t *testing.T, n, block int) (dt int64) {
 	ec := f.Close()
 	er := os.Remove(*fnFlag)
 	if ec != nil {
-		t.Fatal(20, ec)
+		t.Fatal(ec)
 	}
 
 	if er != nil {
-		t.Fatal(30, er)
+		t.Fatal(er)
 	}
 
 	return
@@ -226,6 +228,7 @@ func testBenchRead(t *testing.T, n, block int) (dt int64) {
 
 func TestDevBenchRead(t *testing.T) {
 	if !*devFlag {
+		t.Log("Not enabled")
 		return
 	}
 
@@ -246,22 +249,26 @@ func TestDevBenchRead(t *testing.T) {
 }
 
 func testBenchReadRnd(t *testing.T, n, block int) (dt int64) {
+	println(252, n, block) //TODO-
 	f, err := fcreate(*fnFlag)
+	println(254) //TODO-
 	if err != nil {
-		t.Fatal(10, err)
+		println(254) //TODO-
+		t.Fatal(err)
 	}
 
+	println(259) //TODO-
 	defer func() {
 		f.Accessor().Sync()
 		probed(t, f)
 		ec := f.Close()
 		er := os.Remove(*fnFlag)
 		if ec != nil {
-			t.Fatal(20, ec)
+			t.Fatal(ec)
 		}
 
 		if er != nil {
-			t.Fatal(30, er)
+			t.Fatal(er)
 		}
 	}()
 
@@ -271,10 +278,12 @@ func testBenchReadRnd(t *testing.T, n, block int) (dt int64) {
 	if n >= 1000 {
 		perc = n / 1000
 	}
+	println(281) //TODO-
 	t0 := time.Now().UnixNano()
 	for i := 0; i < n; i++ {
 		if h[i], err = f.Alloc(b); err != nil {
-			t.Fatal(40, err)
+			println(285) //TODO-
+			t.Fatal(err)
 		}
 		if i != 0 && i%perc == 0 {
 			dt := float64((time.Now().UnixNano() - t0) / 1e9)
@@ -285,7 +294,8 @@ func testBenchReadRnd(t *testing.T, n, block int) (dt int64) {
 	}
 	rng, err := mathutil.NewFC32(0, n-1, true)
 	if err != nil {
-		t.Fatal(50, err)
+		println(297) //TODO-
+		t.Fatal(err)
 	}
 	println("\nsync")
 	f.Accessor().Sync()
@@ -293,7 +303,8 @@ func testBenchReadRnd(t *testing.T, n, block int) (dt int64) {
 	t0 = time.Now().UnixNano()
 	for i := 0; i < n; i++ {
 		if _, err := f.Read(h[rng.Next()]); err != nil {
-			t.Fatal(80, err)
+			println(306) //TODO-
+			t.Fatal(err)
 		}
 		if i != 0 && i%perc == 0 {
 			dt := float64((time.Now().UnixNano() - t0) / 1e9)
@@ -303,16 +314,19 @@ func testBenchReadRnd(t *testing.T, n, block int) (dt int64) {
 		}
 	}
 	println()
+	println(314) //TODO-
 	dt = time.Now().UnixNano() - t0
 	if c, ok := f.Accessor().(*storage.Cache); ok {
 		x, _ := c.Stat()
 		t.Logf("Cache rq %10d, load %10d, purge %10d, top %10d, fs %10d", c.Rq, c.Load, c.Purge, c.Top, x.Size())
 	}
+	println(323) //TODO-
 	return
 }
 
 func TestDevBenchReadRnd(t *testing.T) {
 	if !*devFlag {
+		t.Log("Not enabled")
 		return
 	}
 

@@ -17,18 +17,8 @@ package falloc
 import (
 	"bytes"
 	"github.com/cznic/fileutil/storage"
-	"log"
 	"sync"
 )
-
-const asserts = false
-
-func init() {
-	log.SetFlags(log.Flags() | log.Lshortfile)
-	if asserts {
-		log.Print("assertions enabled")
-	}
-}
 
 // Handle is a reference to a block in a file/store.
 // Handle is an uint56 wrapped in an in64, i.e. the most significant byte must be always zero.
@@ -36,10 +26,6 @@ type Handle int64
 
 // Put puts the 7 least significant bytes of h into b. The MSB of h should be zero.
 func (h Handle) Put(b []byte) {
-	if asserts && (uint64(h) >= 1<<56) {
-		panic(&EHandle{Handle: h})
-	}
-
 	for ofs := 6; ofs >= 0; ofs-- {
 		b[ofs] = byte(h)
 		h >>= 8
@@ -86,14 +72,24 @@ var ( // R/O
 // New returns a new File backed by store or an error if any.
 // Any existing data in store are discarded.
 func New(store storage.Accessor) (f *File, err error) {
+	f = &File{f: store}
+	err = store.BeginUpdate()
+
 	defer func() {
+		e2 := f.f.EndUpdate()
 		if e := recover(); e != nil {
 			f = nil
 			err = e.(error)
 		}
+		if err == nil {
+			err = e2
+		}
 	}()
 
-	f = &File{f: store}
+	if err != nil {
+		panic(err)
+	}
+
 	if err = f.f.Truncate(0); err != nil {
 		panic(&ECreate{f.f.Name(), err})
 	}
@@ -171,13 +167,17 @@ func (f *File) Accessor() storage.Accessor {
 
 // Close closes f and returns an error if any.
 func (f *File) Close() (err error) {
-	if asserts && (f.f == nil) {
-		panic("assert fail")
+	if err = f.f.BeginUpdate(); err != nil {
+		f.f.EndUpdate()
+		return
 	}
 
 	if err = f.f.Close(); err != nil {
-		err = &EClose{f.f.Name(), err}
+		f.f.EndUpdate()
+		return &EClose{f.f.Name(), err}
 	}
+
+	err = f.f.EndUpdate()
 	f.f = nil
 	return
 }
@@ -293,12 +293,22 @@ func (f *File) extend(b []byte) (handle int64) {
 
 // Alloc stores b in a newly allocated space and returns its handle and an error if any.
 func (f *File) Alloc(b []byte) (handle Handle, err error) {
+	err = f.f.BeginUpdate()
+
 	defer func() {
+		e2 := f.f.EndUpdate()
 		if e := recover(); e != nil {
 			handle = INVALID_HANDLE
 			err = e.(error)
 		}
+		if err == nil {
+			err = e2
+		}
 	}()
+
+	if err != nil {
+		panic(err)
+	}
 
 	rqAtoms := rq2Atoms(len(b))
 	if rqAtoms > 3856 {
@@ -415,9 +425,6 @@ func (f *File) delFree(atom, atoms int64) {
 	var prev, next Handle
 	prev.Get(b[1:])
 	next.Get(b[8:])
-	if asserts && (prev == 0 && f.freetab[size] != atom) {
-		panic(&ECorrupted{f.f.Name(), fp + 1})
-	}
 
 	switch {
 	case prev == 0 && next != 0:
@@ -510,11 +517,21 @@ func (f *File) Read(handle Handle) (b []byte, err error) {
 // invalid data on Read. It's like corrupting memory via passing an invalid pointer to C.free()
 // or reusing that pointer.
 func (f *File) Free(handle Handle) (err error) {
+	err = f.f.BeginUpdate()
+
 	defer func() {
+		e2 := f.f.EndUpdate()
 		if e := recover(); e != nil {
 			err = e.(error)
 		}
+		if err == nil {
+			err = e2
+		}
 	}()
+
+	if err != nil {
+		panic(err)
+	}
 
 	atom := int64(handle)
 	atoms, isFree := f.getSize(atom)
@@ -559,12 +576,22 @@ func (f *File) Free(handle Handle) (err error) {
 // the database.
 // The above effects are like corrupting memory/data via passing an invalid pointer to C.realloc().
 func (f *File) Realloc(handle Handle, b []byte, keepHandle bool) (newhandle Handle, err error) {
+	err = f.f.BeginUpdate()
+
 	defer func() {
+		e2 := f.f.EndUpdate()
 		if e := recover(); e != nil {
 			newhandle = INVALID_HANDLE
 			err = e.(error)
 		}
+		if err == nil {
+			err = e2
+		}
 	}()
+
+	if err != nil {
+		panic(err)
+	}
 
 	switch handle {
 	case 0, 2:
