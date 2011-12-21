@@ -9,6 +9,7 @@ package storage
 
 import (
 	"os"
+	"sync"
 	"time"
 )
 
@@ -96,4 +97,40 @@ type Accessor interface {
 	// implement BeginUpdate and EndUpdate as a (documented) no op.
 	BeginUpdate() error
 	EndUpdate() error
+}
+
+// Mutate is a helper/wrapper for executing f in between a.BeginUpdate and
+// a.EndUpdate.  Any parameters and/or return values except an error should be
+// captured by a function literal passed as f. The returned err is either nil
+// or the first non nil error returned from the sequence of execution:
+// BeginUpdate, [f,] EndUpdate. The pair BeginUpdate/EndUpdate *is* invoked
+// always regardles of any possible errors produced.  Mutate doesn't handle
+// panic, it should be used only with a function [literal] which doesn't panic.
+// Otherwise the pairing of BeginUpdate/EndUpdate is not guaranteed.
+//
+// NOTE: If BeginUpdate, which is invoked before f, returns a non-nil error,
+// then f is not invoked at all (but EndUpdate still is).
+func Mutate(a Accessor, f func() error) (err error) {
+	defer func() {
+		if e := a.EndUpdate(); e != nil && err == nil {
+			err = e
+		}
+	}()
+
+	if err = a.BeginUpdate(); err != nil {
+		return
+	}
+
+	return f()
+}
+
+// LockedMutate wraps Mutate in yet another layer consisting of a
+// l.Lock/l.Unlock pair. All other limitations apply as in Mutate, e.g. no
+// panics are allowed to happen - otherwise no guarantees can be made about
+// Unlock matching the Lock.
+func LockedMutate(a Accessor, l sync.Locker, f func() error) (err error) {
+	l.Lock()
+	defer l.Unlock()
+
+	return Mutate(a, f)
 }

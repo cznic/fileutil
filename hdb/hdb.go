@@ -15,12 +15,15 @@ hdb are the New, Set, Get and Delete methods of Store.
 
 Conceptual analogy:
 	New	    alloc(sizeof(content)), return new "memory" pointer (a handle).
+
 	Get	    memmove() from "memory" "pointed to" by handle to the result content.
 		    Note: Handle "knows" the size of its content.
+
 	Set	    memmove() from content to "memory" pointed to by handle.
 		    In contrast to real memory, the new content may have different
 		    size than the previously stored one w/o additional handling
 		    and the "pointer" handle remains the same.
+
 	Delete	    free() the "memory" "pointed to" by handle.
 */
 package hdb

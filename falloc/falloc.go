@@ -73,45 +73,30 @@ var ( // R/O
 // Any existing data in store are discarded.
 func New(store storage.Accessor) (f *File, err error) {
 	f = &File{f: store}
-	err = store.BeginUpdate()
-
-	defer func() {
-		e2 := f.f.EndUpdate()
-		if e := recover(); e != nil {
-			f = nil
-			err = e.(error)
+	return f, storage.Mutate(store, func() (err error) {
+		if err = f.f.Truncate(0); err != nil {
+			return &ECreate{f.f.Name(), err}
 		}
-		if err == nil {
-			err = e2
+
+		if _, err = f.Alloc(hdr[1:]); err != nil { //TODO internal panicking versions of the exported fns.
+			return
 		}
-	}()
 
-	if err != nil {
-		panic(err)
-	}
+		if _, err = f.Alloc(nil); err != nil { // (empty) root @1
+			return
+		}
 
-	if err = f.f.Truncate(0); err != nil {
-		panic(&ECreate{f.f.Name(), err})
-	}
+		b := make([]byte, 3856*14)
+		for i := 1; i <= 3856; i++ {
+			Handle(i).Put(b[(i-1)*14:])
+		}
+		if _, err = f.Alloc(b); err != nil {
+			return
+		}
 
-	if _, err = f.Alloc(hdr[1:]); err != nil { //TODO internal panicking versions of the exported fns.
-		panic(err)
-	}
-
-	if _, err = f.Alloc(nil); err != nil { // (empty) root @1
-		panic(err)
-	}
-
-	b := make([]byte, 3856*14)
-	for i := 1; i <= 3856; i++ {
-		Handle(i).Put(b[(i-1)*14:])
-	}
-	if _, err = f.Alloc(b); err != nil {
-		panic(err)
-	}
-
-	f.canfree = f.atoms
-	return
+		f.canfree = f.atoms
+		return
+	})
 }
 
 // Open returns a new File backed by store or an error if any.
@@ -167,19 +152,12 @@ func (f *File) Accessor() storage.Accessor {
 
 // Close closes f and returns an error if any.
 func (f *File) Close() (err error) {
-	if err = f.f.BeginUpdate(); err != nil {
-		f.f.EndUpdate()
+	return storage.Mutate(f.Accessor(), func() (err error) {
+		if err = f.f.Close(); err != nil {
+			err = &EClose{f.f.Name(), err}
+		}
 		return
-	}
-
-	if err = f.f.Close(); err != nil {
-		f.f.EndUpdate()
-		return &EClose{f.f.Name(), err}
-	}
-
-	err = f.f.EndUpdate()
-	f.f = nil
-	return
+	})
 }
 
 // Root returns the handle of the DB root (top level directory, ...).
@@ -293,47 +271,35 @@ func (f *File) extend(b []byte) (handle int64) {
 
 // Alloc stores b in a newly allocated space and returns its handle and an error if any.
 func (f *File) Alloc(b []byte) (handle Handle, err error) {
-	err = f.f.BeginUpdate()
-
-	defer func() {
-		e2 := f.f.EndUpdate()
-		if e := recover(); e != nil {
-			handle = INVALID_HANDLE
-			err = e.(error)
+	err = storage.Mutate(f.Accessor(), func() (err error) {
+		rqAtoms := rq2Atoms(len(b))
+		if rqAtoms > 3856 {
+			return &EBadRequest{f.f.Name(), len(b)}
 		}
-		if err == nil {
-			err = e2
-		}
-	}()
 
-	if err != nil {
-		panic(err)
-	}
-
-	rqAtoms := rq2Atoms(len(b))
-	if rqAtoms > 3856 {
-		panic(&EBadRequest{f.f.Name(), len(b)})
-	}
-
-	for foundsize, foundp := range f.freetab[rqAtoms:] {
-		if foundp != 0 {
-			// this works only for the current unique sizes list (except the last item!)
-			size := int64(foundsize) + rqAtoms
-			handle = Handle(foundp)
-			if size == 3856 {
-				buf := make([]byte, 7)
-				f.read(buf, int64(handle)<<4+15)
-				(*Handle)(&size).Get(buf)
+		for foundsize, foundp := range f.freetab[rqAtoms:] {
+			if foundp != 0 {
+				// this works only for the current unique sizes list (except the last item!)
+				size := int64(foundsize) + rqAtoms
+				handle = Handle(foundp)
+				if size == 3856 {
+					buf := make([]byte, 7)
+					f.read(buf, int64(handle)<<4+15)
+					(*Handle)(&size).Get(buf)
+				}
+				f.delFree(int64(handle), size)
+				if rqAtoms < size {
+					f.addFree(int64(handle)+rqAtoms, size-rqAtoms)
+				}
+				f.writeUsed(b, int64(handle))
+				return
 			}
-			f.delFree(int64(handle), size)
-			if rqAtoms < size {
-				f.addFree(int64(handle)+rqAtoms, size-rqAtoms)
-			}
-			f.writeUsed(b, int64(handle))
-			return
 		}
-	}
-	return Handle(f.extend(b)), nil
+
+		handle = Handle(f.extend(b))
+		return
+	})
+	return
 }
 
 // checkLeft returns the atom size of a free bleck left adjacent to block @atom.
@@ -517,56 +483,42 @@ func (f *File) Read(handle Handle) (b []byte, err error) {
 // invalid data on Read. It's like corrupting memory via passing an invalid pointer to C.free()
 // or reusing that pointer.
 func (f *File) Free(handle Handle) (err error) {
-	err = f.f.BeginUpdate()
-
-	defer func() {
-		e2 := f.f.EndUpdate()
-		if e := recover(); e != nil {
-			err = e.(error)
-		}
-		if err == nil {
-			err = e2
-		}
-	}()
-
-	if err != nil {
-		panic(err)
-	}
-
-	atom := int64(handle)
-	atoms, isFree := f.getSize(atom)
-	if isFree || atom < f.canfree {
-		panic(&EHandle{f.f.Name(), handle})
-	}
-
-	leftFree, rightFree := f.checkLeft(atom), f.checkRight(atom, atoms)
-	switch {
-	case leftFree != 0 && rightFree != 0:
-		f.delFree(atom-leftFree, leftFree)
-		f.delFree(atom+atoms, rightFree)
-		f.addFree(atom-leftFree, leftFree+atoms+rightFree)
-	case leftFree != 0 && rightFree == 0:
-		f.delFree(atom-leftFree, leftFree)
-		if atom+atoms == f.atoms { // the left free neighbour and this block together are an empy tail
-			f.atoms = atom - leftFree
-			f.f.Truncate(f.atoms << 4)
-			return
+	return storage.Mutate(f.Accessor(), func() (err error) {
+		atom := int64(handle)
+		atoms, isFree := f.getSize(atom)
+		if isFree || atom < f.canfree {
+			return &EHandle{f.f.Name(), handle}
 		}
 
-		f.addFree(atom-leftFree, leftFree+atoms)
-	case leftFree == 0 && rightFree != 0:
-		f.delFree(atom+atoms, rightFree)
-		f.addFree(atom, atoms+rightFree)
-	default: // leftFree == 0 && rightFree == 0
-		if atom+atoms < f.atoms { // isolated inner block
-			f.addFree(atom, atoms)
-			return
-		}
+		leftFree, rightFree := f.checkLeft(atom), f.checkRight(atom, atoms)
+		switch {
+		case leftFree != 0 && rightFree != 0:
+			f.delFree(atom-leftFree, leftFree)
+			f.delFree(atom+atoms, rightFree)
+			f.addFree(atom-leftFree, leftFree+atoms+rightFree)
+		case leftFree != 0 && rightFree == 0:
+			f.delFree(atom-leftFree, leftFree)
+			if atom+atoms == f.atoms { // the left free neighbour and this block together are an empy tail
+				f.atoms = atom - leftFree
+				f.f.Truncate(f.atoms << 4)
+				return
+			}
 
-		f.f.Truncate(atom << 4) // isolated tail block, shrink file
-		f.atoms = atom
-	}
-	return
+			f.addFree(atom-leftFree, leftFree+atoms)
+		case leftFree == 0 && rightFree != 0:
+			f.delFree(atom+atoms, rightFree)
+			f.addFree(atom, atoms+rightFree)
+		default: // leftFree == 0 && rightFree == 0
+			if atom+atoms < f.atoms { // isolated inner block
+				f.addFree(atom, atoms)
+				return
+			}
+
+			f.f.Truncate(atom << 4) // isolated tail block, shrink file
+			f.atoms = atom
+		}
+		return
+	})
 }
 
 // Realloc reallocates space associted with handle to acomodate b, returns the newhandle
@@ -576,108 +528,95 @@ func (f *File) Free(handle Handle) (err error) {
 // the database.
 // The above effects are like corrupting memory/data via passing an invalid pointer to C.realloc().
 func (f *File) Realloc(handle Handle, b []byte, keepHandle bool) (newhandle Handle, err error) {
-	err = f.f.BeginUpdate()
-
-	defer func() {
-		e2 := f.f.EndUpdate()
-		if e := recover(); e != nil {
-			newhandle = INVALID_HANDLE
-			err = e.(error)
+	err = storage.Mutate(f.Accessor(), func() (err error) {
+		switch handle {
+		case 0, 2:
+			return &EHandle{f.f.Name(), handle}
+		case 1:
+			keepHandle = true
 		}
-		if err == nil {
-			err = e2
+		newhandle = handle
+		atom, newatoms := int64(handle), rq2Atoms(len(b))
+		if newatoms > 3856 {
+			return &EBadRequest{f.f.Name(), len(b)}
 		}
-	}()
 
-	if err != nil {
-		panic(err)
-	}
-
-	switch handle {
-	case 0, 2:
-		panic(&EHandle{f.f.Name(), handle})
-	case 1:
-		keepHandle = true
-	}
-	newhandle = handle
-	atom, newatoms := int64(handle), rq2Atoms(len(b))
-	if newatoms > 3856 {
-		panic(&EBadRequest{f.f.Name(), len(b)})
-	}
-
-	typ, oldatoms := f.getInfo(atom)
-	switch {
-	default:
-		panic(&ECorrupted{f.f.Name(), atom << 4})
-	case typ <= 0xfc: // non relocated used block
+		typ, oldatoms := f.getInfo(atom)
 		switch {
-		case newatoms == oldatoms: // in place replace
-			f.writeUsed(b, atom)
-		case newatoms < oldatoms: // in place shrink
-			rightFree := f.checkRight(atom, oldatoms)
-			if rightFree > 0 { // right join
-				f.delFree(atom+oldatoms, rightFree)
-			}
-			f.addFree(atom+newatoms, oldatoms+rightFree-newatoms)
-			f.writeUsed(b, atom)
-		case newatoms > oldatoms:
-			if rightFree := f.checkRight(atom, oldatoms); rightFree > 0 && newatoms <= oldatoms+rightFree {
-				f.delFree(atom+oldatoms, rightFree)
-				if newatoms < oldatoms+rightFree {
-					f.addFree(atom+newatoms, oldatoms+rightFree-newatoms)
-				}
-				f.writeUsed(b, atom)
-				return
-			}
-
-			if !keepHandle {
-				f.Free(Handle(atom))
-				return f.Alloc(b)
-			}
-
-			// reloc
-			newatom, e := f.Alloc(b)
-			if e != nil {
-				panic(e)
-			}
-
-			buf := make([]byte, 16)
-			buf[0] = 0xfd
-			Handle(newatom).Put(buf[1:])
-			f.Realloc(Handle(atom), buf[1:], true)
-			f.write(buf[:1], atom<<4)
-		}
-	case typ == 0xfd: // reloc
-		var target Handle
-		buf := make([]byte, 7)
-		f.read(buf, atom<<4+1)
-		target.Get(buf)
-		switch {
-		case newatoms == 1:
-			f.writeUsed(b, atom)
-			f.Free(target)
 		default:
-			if rightFree := f.checkRight(atom, 1); rightFree > 0 && newatoms <= 1+rightFree {
-				f.delFree(atom+1, rightFree)
-				if newatoms < 1+rightFree {
-					f.addFree(atom+newatoms, 1+rightFree-newatoms)
+			return &ECorrupted{f.f.Name(), atom << 4}
+		case typ <= 0xfc: // non relocated used block
+			switch {
+			case newatoms == oldatoms: // in place replace
+				f.writeUsed(b, atom)
+			case newatoms < oldatoms: // in place shrink
+				rightFree := f.checkRight(atom, oldatoms)
+				if rightFree > 0 { // right join
+					f.delFree(atom+oldatoms, rightFree)
 				}
+				f.addFree(atom+newatoms, oldatoms+rightFree-newatoms)
+				f.writeUsed(b, atom)
+			case newatoms > oldatoms:
+				if rightFree := f.checkRight(atom, oldatoms); rightFree > 0 && newatoms <= oldatoms+rightFree {
+					f.delFree(atom+oldatoms, rightFree)
+					if newatoms < oldatoms+rightFree {
+						f.addFree(atom+newatoms, oldatoms+rightFree-newatoms)
+					}
+					f.writeUsed(b, atom)
+					return
+				}
+
+				if !keepHandle {
+					f.Free(Handle(atom))
+					newhandle, err = f.Alloc(b)
+					return
+				}
+
+				// reloc
+				newatom, e := f.Alloc(b)
+				if e != nil {
+					return e
+				}
+
+				buf := make([]byte, 16)
+				buf[0] = 0xfd
+				Handle(newatom).Put(buf[1:])
+				f.Realloc(Handle(atom), buf[1:], true)
+				f.write(buf[:1], atom<<4)
+			}
+		case typ == 0xfd: // reloc
+			var target Handle
+			buf := make([]byte, 7)
+			f.read(buf, atom<<4+1)
+			target.Get(buf)
+			switch {
+			case newatoms == 1:
 				f.writeUsed(b, atom)
 				f.Free(target)
-				return
-			}
+			default:
+				if rightFree := f.checkRight(atom, 1); rightFree > 0 && newatoms <= 1+rightFree {
+					f.delFree(atom+1, rightFree)
+					if newatoms < 1+rightFree {
+						f.addFree(atom+newatoms, 1+rightFree-newatoms)
+					}
+					f.writeUsed(b, atom)
+					f.Free(target)
+					return
+				}
 
-			newtarget, e := f.Realloc(Handle(target), b, false)
-			if e != nil {
-				panic(e)
-			}
+				newtarget, e := f.Realloc(Handle(target), b, false)
+				if e != nil {
+					return e
+				}
 
-			if newtarget != target {
-				Handle(newtarget).Put(buf)
-				f.write(buf, atom<<4+1)
+				if newtarget != target {
+					Handle(newtarget).Put(buf)
+					f.write(buf, atom<<4+1)
+				}
 			}
 		}
-	}
+		return
+	})
 	return
 }
 
