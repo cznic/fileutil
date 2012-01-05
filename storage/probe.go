@@ -4,7 +4,6 @@
 
 // blame: jnml, labs.nic.cz
 
-
 package storage
 
 import "sync/atomic"
