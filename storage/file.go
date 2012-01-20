@@ -27,7 +27,7 @@ func (f *FileAccessor) EndUpdate() error { return nil }
 // I/O.  It returns the Accessor and an Error, if any.  
 //
 // NOTE: The returned Accessor implements BeginUpdate and EndUpdate as a no op.
-func NewFile(name string, flag int, perm uint32) (store Accessor, err error) {
+func NewFile(name string, flag int, perm os.FileMode) (store Accessor, err error) {
 	var f FileAccessor
 	if f.File, err = os.OpenFile(name, flag, perm); err == nil {
 		store = &f
@@ -41,7 +41,7 @@ func NewFile(name string, flag int, perm uint32) (store Accessor, err error) {
 // used for I/O.  It returns the Accessor and an Error, if any. 
 //
 // NOTE: The returned Accessor implements BeginUpdate and EndUpdate as a no op.
-func OpenFile(name string, flag int, perm uint32) (store Accessor, err error) {
+func OpenFile(name string, flag int, perm os.FileMode) (store Accessor, err error) {
 	var f FileAccessor
 	if f.File, err = os.OpenFile(name, flag, perm); err == nil {
 		store = &f

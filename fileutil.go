@@ -23,7 +23,7 @@ type GoMFile struct {
 }
 
 // NewGoMFile return a newly created GoMFile.
-func NewGoMFile(fname string, flag int, perm uint32, delta_ns int64) (m *GoMFile, err error) {
+func NewGoMFile(fname string, flag int, perm os.FileMode, delta_ns int64) (m *GoMFile, err error) {
 	m = &GoMFile{}
 	if m.mfile, err = NewMFile(fname, flag, perm, delta_ns); err != nil {
 		m = nil
@@ -69,7 +69,7 @@ type MFile struct {
 // NewMFile returns a newly created MFile or Error if any.
 // The fname, flag and perm parameters have the same meaning as in os.Open.
 // For meaning of the delta_ns parameter please see the (m *MFile) File() docs.
-func NewMFile(fname string, flag int, perm uint32, delta_ns int64) (m *MFile, err error) {
+func NewMFile(fname string, flag int, perm os.FileMode, delta_ns int64) (m *MFile, err error) {
 	m = &MFile{}
 	var secs, nsecs int64
 	if secs, nsecs, err = os.Time(); err != nil {
