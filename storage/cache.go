@@ -130,7 +130,6 @@ func NewCache(store Accessor, maxcache int64, advise func(int64, int, bool)) (c 
 		clean:    make(chan bool, 1),
 		close:    make(chan bool),
 		f:        store,
-		fi:       NewFileInfo(fi),
 		lru:      list.New(), // front == oldest used, back == last recently used
 		m:        make(map[int64]*cachepage),
 		maxpages: int(x),
@@ -139,6 +138,7 @@ func NewCache(store Accessor, maxcache int64, advise func(int64, int, bool)) (c 
 		wlist:    list.New(),
 		write:    make(chan bool, 1),
 	}
+	c.fi = NewFileInfo(fi, c)
 	go c.writer()
 	go c.cleaner(int((int64(c.maxpages) * 95) / 100)) // hysteresis
 	return

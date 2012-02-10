@@ -22,11 +22,12 @@ type FileInfo struct {
 	FMode    os.FileMode // file mode bits
 	FModTime time.Time   // modification time
 	FIsDir   bool        // abbreviation for Mode().IsDir()
+	sys      interface{} // underlying data source (can be nil)
 }
 
 // NewFileInfo creates FileInfo from os.FileInfo fi.
-func NewFileInfo(fi os.FileInfo) *FileInfo {
-	return &FileInfo{fi.Name(), fi.Size(), fi.Mode(), fi.ModTime(), fi.IsDir()}
+func NewFileInfo(fi os.FileInfo, sys interface{}) *FileInfo {
+	return &FileInfo{fi.Name(), fi.Size(), fi.Mode(), fi.ModTime(), fi.IsDir(), sys}
 }
 
 // Implementation of os.FileInfo
@@ -52,6 +53,10 @@ func (fi *FileInfo) ModTime() time.Time {
 // Implementation of os.FileInfo
 func (fi *FileInfo) IsDir() bool {
 	return fi.FIsDir
+}
+
+func (fi *FileInfo) Sys() interface{} {
+	return fi.sys
 }
 
 // Accessor provides I/O methods to access a store.

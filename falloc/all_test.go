@@ -8,12 +8,12 @@ package falloc
 
 import (
 	"bytes"
-	"github.com/cznic/fileutil"
-	"github.com/cznic/fileutil/storage"
-	"github.com/cznic/mathutil"
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/cznic/fileutil"
+	"github.com/cznic/fileutil/storage"
+	"github.com/cznic/mathutil"
 	"io/ioutil"
 	"log"
 	"math"

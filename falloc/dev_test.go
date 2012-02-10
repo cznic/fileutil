@@ -60,13 +60,16 @@ func qmap(x []int) (y []int) {
 
 func qmapmem(nFlag int) uint64 {
 	m := map[int64]bool{}
+	var ms runtime.MemStats
 	runtime.GC()
-	mem := runtime.MemStats.HeapAlloc
+	runtime.ReadMemStats(&ms)
+	mem := ms.HeapAlloc
 	for i := 0; i < nFlag; i++ {
 		m[int64(i)] = true
 	}
 	runtime.GC()
-	return runtime.MemStats.HeapAlloc - mem
+	runtime.ReadMemStats(&ms)
+	return ms.HeapAlloc - mem
 }
 
 func TestDev0(t *testing.T) {

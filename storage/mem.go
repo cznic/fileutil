@@ -14,6 +14,7 @@ import (
 	"os"
 )
 
+//TODO -> exported type w/ exported fields
 type memaccessor struct {
 	f  *os.File
 	fi *FileInfo
@@ -44,7 +45,7 @@ func NewMem(f *os.File) (store Accessor, err error) {
 		return
 	}
 
-	a.fi = NewFileInfo(fi)
+	a.fi = NewFileInfo(fi, a)
 	store = a
 	return
 }
@@ -69,7 +70,7 @@ func OpenMem(f *os.File) (store Accessor, err error) {
 		return
 	}
 
-	a.fi = NewFileInfo(fi)
+	a.fi = NewFileInfo(fi, a)
 	store = a
 	return
 }
