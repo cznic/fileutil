@@ -4,12 +4,12 @@
 
 // blame: jnml, labs.nic.cz
 
-package hdb
+package falloc
 
+// Pull test dependencies too.
+// Enables easy 'go test X' after 'go get X'
 import (
-	"testing"
+	_ "cznic/fileutil"
+	_ "cznic/fileutil/storage"
+	_ "cznic/mathutil"
 )
-
-func TestPlaceholder(t *testing.T) {
-	t.Log("TODO") //TODO
-}

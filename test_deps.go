@@ -4,12 +4,10 @@
 
 // blame: jnml, labs.nic.cz
 
-package hdb
+package fileutil
 
+// Pull test dependencies too.
+// Enables easy 'go test X' after 'go get X'
 import (
-	"testing"
+// nothing yet
 )
-
-func TestPlaceholder(t *testing.T) {
-	t.Log("TODO") //TODO
-}
