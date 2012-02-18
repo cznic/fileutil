@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"sync"
 	"syscall"
+	"time"
 )
 
 // GoMFile is a concurrent access safe version of MFile.
@@ -71,12 +72,7 @@ type MFile struct {
 // For meaning of the delta_ns parameter please see the (m *MFile) File() docs.
 func NewMFile(fname string, flag int, perm os.FileMode, delta_ns int64) (m *MFile, err error) {
 	m = &MFile{}
-	var secs, nsecs int64
-	if secs, nsecs, err = os.Time(); err != nil {
-		return
-	}
-
-	m.t0 = secs*1e9 + nsecs
+	m.t0 = time.Now().UnixNano()
 	if m.file, err = os.OpenFile(fname, flag, perm); err != nil {
 		return
 	}
@@ -114,12 +110,7 @@ func (m *MFile) File() (file *os.File, err error) {
 
 	mustCheck := m.delta == 0
 	if !mustCheck {
-		var secs, nsecs int64
-		if secs, nsecs, err = os.Time(); err != nil {
-			return
-		}
-
-		now = secs*1e9 + nsecs
+		now = time.Now().UnixNano()
 		mustCheck = now-m.t0 > m.delta
 	}
 
