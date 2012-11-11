@@ -124,7 +124,7 @@ This block type is used for content of length in 1...237 bytes.  The value of
 the "padding" field, if of non zero length, is undefined.
 
 If the last byte of content is the last byte of an atom (== its file byte
-offset & 0xF == 0xF) then such last byte MUST be in 0x00...0xFD. 
+offset & 0xF == 0xF) then such last byte MUST be in 0x00...0xFD.
 
 If the last byte of content is the last byte of an atom AND the last byte of
 content is 0xFE or 0xFF then the short escape block type (0xEE...0xFB) MUST be
@@ -200,7 +200,7 @@ removed from their original doubly linked lists. Afterwards the new bigger free
 block is put to the free list table in the appropriate item.
 
 Items with address field == 0 are legal. Such item is a placeholder for a empty
-list of free blocks of the item's size. 
+list of free blocks of the item's size.
 
 Items with size field == 0 are legal. Such item is a placeholder, used e.g. to
 avoid further reallocations/redirecting of the free lists table.
@@ -210,7 +210,7 @@ The largest possible allocation request (for content length 61680 bytes) is
 into a single table item with the size 3856. It may be useful to additionally
 have a free lists table item which links free blocks of some bigger size (say
 1M+) and then use the OS sparse file support (if present) to save the physical
-space used by such free blocks. 
+space used by such free blocks.
 
 Smaller (<3856 atoms) free blocks can be organized exactly (every distinct size
 has its table item) or the sizes can run using other schema like e.g. "1, 2,
@@ -226,9 +226,9 @@ The header block has the standard layout of a used short non escaped block.
 
 Special conditions apply: The header block and its content MUST be like this:
 
- +------+---------+---------+------+		
+ +------+---------+---------+------+
  |  0   |  1...7  | 8...14  |  15  |
- +------+---------+---------+------+		
+ +------+---------+---------+------+
  | 0x0F | m6...m0 | f6...f0 | FLTT |
  +------+---------+---------+------+
 
@@ -241,7 +241,7 @@ FLTT describes the type of the Free List Table. Currently defined values:
 
 ------------------------------------------------------------------------------
 
-FLTT == 0: Free List Table is fixed at atom address 2. It has a fixed size for 3856 entries 
+FLTT == 0: Free List Table is fixed at atom address 2. It has a fixed size for 3856 entries
 for free list of size 1..3855 atoms and the last is for the list of free block >= 3856 atoms.
 */
 package falloc

@@ -99,7 +99,7 @@ type Cache struct {
 	write    chan bool
 	writing  int32
 	Rq       int64 // Pages requested from cache
-	Load     int64 // Pages loaded (cache miss) 
+	Load     int64 // Pages loaded (cache miss)
 	Purge    int64 // Pages purged
 	Top      int   // "High water" pages
 }

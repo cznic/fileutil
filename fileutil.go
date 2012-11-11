@@ -161,10 +161,10 @@ type FadviseAdvice int
 // FAdviseAdvice values.
 const (
 	// $ grep FADV /usr/include/bits/fcntl.h
-	POSIX_FADV_NORMAL     FadviseAdvice = iota // No further special treatment.  
-	POSIX_FADV_RANDOM                          // Expect random page references.  
-	POSIX_FADV_SEQUENTIAL                      // Expect sequential page references.	 
-	POSIX_FADV_WILLNEED                        // Will need these pages.  
-	POSIX_FADV_DONTNEED                        // Don't need these pages.  
-	POSIX_FADV_NOREUSE                         // Data will be accessed once.  
+	POSIX_FADV_NORMAL     FadviseAdvice = iota // No further special treatment.
+	POSIX_FADV_RANDOM                          // Expect random page references.
+	POSIX_FADV_SEQUENTIAL                      // Expect sequential page references.
+	POSIX_FADV_WILLNEED                        // Will need these pages.
+	POSIX_FADV_DONTNEED                        // Don't need these pages.
+	POSIX_FADV_NOREUSE                         // Data will be accessed once.
 )

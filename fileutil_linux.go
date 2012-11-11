@@ -9,6 +9,7 @@ import (
 	"os"
 	"syscall"
 )
+
 // Fadvise predeclares an access pattern for file data.
 // See also 'man 2 posix_fadvise'.
 func Fadvise(f *os.File, off, len int64, advice FadviseAdvice) (err error) {

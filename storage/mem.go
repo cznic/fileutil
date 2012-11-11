@@ -31,7 +31,7 @@ func (f *memaccessor) EndUpdate() error { return nil }
 // keeps all of the store content in memory.  The memory and file images are
 // synced only by Sync and Close.  Recomended for small amounts of data only
 // and content which may be lost on process kill/crash.  NewMem return the
-// Accessor or an error of any. 
+// Accessor or an error of any.
 //
 // NOTE: The returned Accessor implements BeginUpdate and EndUpdate as a no op.
 func NewMem(f *os.File) (store Accessor, err error) {
@@ -54,7 +54,7 @@ func NewMem(f *os.File) (store Accessor, err error) {
 // loaded from f.  The returned Accessor keeps all of the store content in
 // memory.  The memory and file images are synced only Sync and Close.
 // Recomended for small amounts of data only and content which may be lost on
-// process kill/crash.  OpenMem return the Accessor or an error of any. 
+// process kill/crash.  OpenMem return the Accessor or an error of any.
 //
 // NOTE: The returned Accessor implements BeginUpdate and EndUpdate as a no op.
 func OpenMem(f *os.File) (store Accessor, err error) {
