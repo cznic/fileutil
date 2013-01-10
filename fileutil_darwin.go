@@ -11,8 +11,14 @@ import (
 	"os"
 )
 
-// Fadvise predeclares an access pattern for file data.
-// See also 'man 2 posix_fadvise'. Not available in OSX.
-func Fadvise(f *os.File, off, len int64, advice FadviseAdvice) (err error) {
-	return os.NewSyscallError("SYS_FADVISE64", fmt.Errorf("not implemented"))
+// PunchHole deallocates space inside a file in the byte range starting at
+// offset and continuing for len bytes. Not supported on OSX.
+func PunchHole(f *os.File, off, len int64) error {
+	return nil
+}
+
+// Fadvise predeclares an access pattern for file data.  See also 'man 2
+// posix_fadvise'. Not supported on OSX.
+func Fadvise(f *os.File, off, len int64, advice FadviseAdvice) error {
+	return nil
 }
