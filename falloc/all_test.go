@@ -231,10 +231,10 @@ func (f *File) audit() (usedblocks, totalblocks int64, err error) {
 			f.read(buf[:2], fp+1)
 			switch n := int(buf[0])<<8 + int(buf[1]); {
 			default:
-				panic(fmt.Errorf("@#x used long, illegal content length %#x < 0xee(238)", fp, n, n))
+				panic(fmt.Errorf("@%#x used long, illegal content length %#x < 0xee(238)", fp, n))
 			case n >= 0xee && n <= 0xf0f0:
 				if last >= 0xfe {
-					panic(fmt.Errorf("@#x used long, last @%#x: %#x > 0xfe", fp, fp+size<<4-1, last))
+					panic(fmt.Errorf("@%#x used long, last @%#x: %#x > 0xfe", fp, fp+size<<4-1, last))
 				}
 			case n >= 0xf0f1 && n <= 0xffff:
 				if last > 1 {
@@ -255,11 +255,11 @@ func (f *File) audit() (usedblocks, totalblocks int64, err error) {
 
 			ttyp, _ := f.getInfo(target)
 			if ttyp >= 0xfe {
-				panic(fmt.Errorf("@%#x reloc, points to unused @%#x", fp, fp+size<<4-1, target))
+				panic(fmt.Errorf("@%#x reloc, points to unused @%#x", fp, target))
 			}
 
 			if ttyp == 0xfd {
-				panic(fmt.Errorf("@%#x reloc, points to reloc @%#x", fp, fp+size<<4-1, target))
+				panic(fmt.Errorf("@%#x reloc, points to reloc @%#x", fp, target))
 			}
 		case typ == 0xfe:
 			if size < 2 {
