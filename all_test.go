@@ -7,9 +7,34 @@
 package fileutil
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
-func TestPlaceholder(t *testing.T) {
-	t.Log("TODO") //TODO
+func TestTempFile(t *testing.T) {
+	f, err := TempFile("", "abc", "mno.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	n := f.Name()
+	defer func() {
+		f.Close()
+		os.Remove(n)
+	}()
+
+	base := filepath.Base(n)
+	if base == "abcmno.xyz" {
+		t.Fatal(base)
+	}
+
+	if !strings.HasPrefix(base, "abc") {
+		t.Fatal(base)
+	}
+
+	if !strings.HasSuffix(base, "mno.xyz") {
+		t.Fatal(base)
+	}
 }
