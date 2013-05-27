@@ -176,12 +176,13 @@ const (
 )
 
 // TempFile creates a new temporary file in the directory dir with a name
-// ending with suffix, opens the file for reading and writing, and returns the
-// resulting *os.File.  If dir is the empty string, TempFile uses the default
-// directory for temporary files (see os.TempDir).  Multiple programs calling
-// TempFile simultaneously will not choose the same file.  The caller can use
-// f.Name() to find the pathname of the file.  It is the caller's
-// responsibility to remove the file when no longer needed.
+// ending with suffix, basename starting with prefix, opens the file for
+// reading and writing, and returns the resulting *os.File.  If dir is the
+// empty string, TempFile uses the default directory for temporary files (see
+// os.TempDir).  Multiple programs calling TempFile simultaneously will not
+// choose the same file.  The caller can use f.Name() to find the pathname of
+// the file.  It is the caller's responsibility to remove the file when no
+// longer needed.
 //
 // NOTE: This function differs from ioutil.TempFile.
 func TempFile(dir, prefix, suffix string) (f *os.File, err error) {

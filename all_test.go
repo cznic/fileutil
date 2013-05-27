@@ -20,6 +20,7 @@ func TestTempFile(t *testing.T) {
 	}
 
 	n := f.Name()
+	t.Log(n)
 	defer func() {
 		f.Close()
 		os.Remove(n)
