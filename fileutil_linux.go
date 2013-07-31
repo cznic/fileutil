@@ -32,13 +32,18 @@ func init() {
 	}
 
 	tokens := bytes.Split(b, []byte("."))
-	if n := len(tokens); n < 3 {
+	switch len(tokens) {
+	case 3:
+		// Supported since kernel 2.6.38
+		if bytes.Compare([]byte{n(tokens[0]), n(tokens[1]), n(tokens[2])}, []byte{2, 6, 38}) < 0 {
+			puncher = func(*os.File, int64, int64) error { return nil }
+		}
+	case 2:
+		if bytes.Compare([]byte{n(tokens[0]), n(tokens[1])}, []byte{2, 7}) < 0 {
+			puncher = func(*os.File, int64, int64) error { return nil }
+		}
+	default:
 		panic(n)
-	}
-
-	// Supported since kernel 2.6.38
-	if bytes.Compare([]byte{n(tokens[0]), n(tokens[1]), n(tokens[2])}, []byte{2, 6, 38}) < 0 {
-		puncher = func(*os.File, int64, int64) error { return nil }
 	}
 }
 
@@ -62,7 +67,7 @@ var puncher = func(f *os.File, off, len int64) error {
 }
 
 // PunchHole deallocates space inside a file in the byte range starting at
-// offset and continuing for len bytes. No-op for kernels < 2.6.38.
+// offset and continuing for len bytes. No-op for kernels < 2.6.38 (or < 2.7).
 func PunchHole(f *os.File, off, len int64) error {
 	return puncher(f, off, len)
 }
