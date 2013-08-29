@@ -8,6 +8,7 @@ package fileutil
 
 import (
 	"bytes"
+	"io"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -84,3 +85,6 @@ func Fadvise(f *os.File, off, len int64, advice FadviseAdvice) error {
 		0, 0)
 	return os.NewSyscallError("SYS_FADVISE64", errno)
 }
+
+// IsEOF reports whether err is an EOF condition.
+func IsEOF(err error) bool { return err == io.EOF }

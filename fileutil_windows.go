@@ -5,6 +5,7 @@
 package fileutil
 
 import (
+	"io"
 	"os"
 )
 
@@ -18,4 +19,14 @@ func PunchHole(f *os.File, off, len int64) error {
 // posix_fadvise'. Not supported on Windows.
 func Fadvise(f *os.File, off, len int64, advice FadviseAdvice) error {
 	return nil
+}
+
+// IsEOF reports whether err is an EOF condition.
+func IsEOF(err error) bool {
+	if err == io.EOF {
+		return true
+	}
+
+	x, ok := err.(*os.PathError)
+	return ok && x.Op == "read" && x.Err == 0x26
 }
