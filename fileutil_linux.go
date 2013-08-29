@@ -33,6 +33,9 @@ func init() {
 	}
 
 	tokens := bytes.Split(b, []byte("."))
+	if len(tokens) > 3 {
+		tokens = tokens[:3]
+	}
 	switch len(tokens) {
 	case 3:
 		// Supported since kernel 2.6.38
@@ -44,7 +47,7 @@ func init() {
 			puncher = func(*os.File, int64, int64) error { return nil }
 		}
 	default:
-		panic(n)
+		puncher = func(*os.File, int64, int64) error { return nil }
 	}
 }
 
