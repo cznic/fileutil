@@ -41,11 +41,14 @@ var (
 	procDeviceIOControl = modkernel32.NewProc("DeviceIoControl")
 
 	sparseFilesMu sync.Mutex
-	sparseFiles   map[*os.File]struct{}
+	sparseFiles   map[uintptr]struct{}
 )
 
 func init() {
-	sparseFiles = make(map[*os.File]struct{})
+	// sparseFiles is an fd set for already "sparsed" files - according to
+	// msdn.microsoft.com/en-us/library/windows/desktop/aa364225(v=vs.85).aspx
+	// the file handles are unique per process.
+	sparseFiles = make(map[uintptr]struct{})
 }
 
 // puncHoleWindows punches a hole into the given file starting at offset,
@@ -77,13 +80,18 @@ func puncher(file *os.File, offset, size int64) error {
 // }
 
 func ensureFileSparse(file *os.File) (err error) {
+	fd := file.Fd()
 	sparseFilesMu.Lock()
-	if _, ok := sparseFiles[file]; ok {
+	if _, ok := sparseFiles[fd]; ok {
 		sparseFilesMu.Unlock()
 		return nil
 	}
 
-	return deviceIOControl(true, file.Fd(), 0, 0)
+	if err = deviceIOControl(true, fd, 0, 0); err == nil {
+		sparseFiles[fd] = struct{}{}
+	}
+	sparseFilesMu.Unlock()
+	return err
 }
 
 func deviceIOControl(setSparse bool, fd, inBuf, inBufLen uintptr) (err error) {
