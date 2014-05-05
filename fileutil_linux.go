@@ -67,7 +67,10 @@ var puncher = func(f *os.File, off, len int64) error {
 		uintptr(off),
 		uintptr(len),
 		0, 0)
-	return os.NewSyscallError("SYS_FALLOCATE", errno)
+	if errno != 0 {
+		return os.NewSyscallError("SYS_FALLOCATE", errno)
+	}
+	return nil
 }
 
 // PunchHole deallocates space inside a file in the byte range starting at
