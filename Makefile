@@ -1,4 +1,4 @@
-.PHONY: all clean
+.PHONY: all clean editor todo
 
 all: editor
 	go vet
@@ -12,10 +12,10 @@ editor:
 	go build
 
 todo:
-	@grep -n ^[[:space:]]*_[[:space:]]*=[[:space:]][[:alpha:]][[:alnum:]]* *.go *.y || true
-	@grep -n TODO *.go *.y || true
-	@grep -n BUG *.go *.y || true
-	@grep -n println *.go *.y || true
+	@grep -n ^[[:space:]]*_[[:space:]]*=[[:space:]][[:alpha:]][[:alnum:]]* *.go || true
+	@grep -n TODO *.go || true
+	@grep -n BUG *.go || true
+	@grep -n println *.go || true
 
 clean:
 	@go clean

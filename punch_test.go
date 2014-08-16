@@ -36,7 +36,7 @@ func TestPunch(t *testing.T) {
 		// read back, with 1-1 bytes overlaid
 		n, err := file.ReadAt(buf[:j+2], int64(j-1))
 		if err != nil {
-			t.Errorf("%d. error reading file: %v", err)
+			t.Errorf("%d. error reading file: %v", i, err)
 			continue
 		}
 		buf = buf[:n]
