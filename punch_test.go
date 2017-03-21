@@ -46,6 +46,10 @@ func TestPunch(t *testing.T) {
 		if buf[n-1] == 0 {
 			t.Errorf("%d. file at %d has been overwritten with 0!", i, j-1+n)
 		}
+		if !hasPunchHole {
+			continue
+		}
+
 		for k, v := range buf[1 : n-1] {
 			if v != 0 {
 				t.Errorf("%d. error reading file at %d got %d, want 0.", i, k, v)
